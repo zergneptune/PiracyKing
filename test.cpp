@@ -131,17 +131,11 @@ int main(int argc, char const *argv[])
 	cout << "A, C: " << std::is_same<A,C>::value << std::endl;
 	cout << "signed char, std::int8_t: " << std::is_same<signed char,std::int8_t>::value << std::endl;
 	*/
-	BinaryTreeNode node1(10);
-	BinaryTreeNode node2(5);
-	BinaryTreeNode node3(12);
-	BinaryTreeNode node4(4);
-	BinaryTreeNode node5(7);
-	node1.m_pLeft = &node2;
-	node1.m_pRight = &node3;
-	node2.m_pLeft = &node4;
-	node2.m_pRight = &node5;
-	cout << "--------" << endl;
-	PrintPath(&node1, 22);
+	int a[] = {5, 7, 6, 9, 11, 10, 8};
+	int b[] = {1, 2, 3, 4, 5, 6};
+	cout << std::boolalpha;
+	cout << isPostOrderOfBST(a, 7) << endl;
+	cout << isPostOrderOfBST(b, 6) << endl;
 	return 0;
 }
 

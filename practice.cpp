@@ -115,3 +115,43 @@ void PrintPath(BinaryTreeNode* pHead, int sum)
 {
 	core(pHead, sum);
 }
+
+bool helper_isPostOrderOfBST(int a[], int low, int high)
+{
+	int rootNode = a[high];
+	int i = low;
+	bool lc_tree, rc_tree;
+
+	if(low >= high)
+	{
+		return true;
+	}
+
+	for(; i <= high && a[i] < rootNode; ++i){}
+	if(i <= high)
+	{
+		lc_tree = helper_isPostOrderOfBST(a, low, i - 1);
+	}
+
+	int save_i = i;
+	for(; i <= high; ++i)
+	{
+		if(a[i] < rootNode)
+		{
+			return false;
+		}
+	}
+	rc_tree = helper_isPostOrderOfBST(a, save_i, high - 1);
+
+	return lc_tree && rc_tree;
+}
+
+bool isPostOrderOfBST(int a[], int len)
+{
+	return helper_isPostOrderOfBST(a, 0, len - 1);
+}
+
+
+
+
+

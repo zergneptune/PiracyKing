@@ -190,3 +190,5 @@ void CreateDeque(BinaryTreeNode* pCurrNode, BinaryTreeNode** pDQueHead);
 void PrintPath(BinaryTreeNode* pHead, int sum);
 
 int jump(int row, int col);
+
+bool isPostOrderOfBST(int a[], int len);
