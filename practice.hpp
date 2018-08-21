@@ -192,3 +192,5 @@ void PrintPath(BinaryTreeNode* pHead, int sum);
 int jump(int row, int col);
 
 bool isPostOrderOfBST(int a[], int len);
+
+int bm_search(char* text, int text_len, char* pattern, int pattern_len);

@@ -131,11 +131,12 @@ int main(int argc, char const *argv[])
 	cout << "A, C: " << std::is_same<A,C>::value << std::endl;
 	cout << "signed char, std::int8_t: " << std::is_same<signed char,std::int8_t>::value << std::endl;
 	*/
-	int a[] = {5, 7, 6, 9, 11, 10, 8};
-	int b[] = {1, 2, 3, 4, 5, 6};
-	cout << std::boolalpha;
-	cout << isPostOrderOfBST(a, 7) << endl;
-	cout << isPostOrderOfBST(b, 6) << endl;
+	char text[] = "aabbccabcab";
+	char pattern[] = "bb";
+	int res = bm_search(text, strlen(text), pattern, strlen(pattern));
+	cout << "text = " << text << endl;
+	cout << "pattern = " << pattern << endl;
+	cout << "res = " << res << endl;
 	return 0;
 }
 

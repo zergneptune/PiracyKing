@@ -151,7 +151,105 @@ bool isPostOrderOfBST(int a[], int len)
 	return helper_isPostOrderOfBST(a, 0, len - 1);
 }
 
+int* CreateBC(char* pattern, int len)
+{
+	int* bc = new int[256];
 
+	for(int i = 0; i < 256; ++i)
+	{
+		bc[i] = -1;
+	}
 
+	for(int i = 0; i < len; ++i)
+	{
+		bc[pattern[i]] = i;
+	}
 
+	return bc;
+}
 
+int* CreateSuffix(char* pattern, int len)
+{
+	int* suffix = new int[len];
+	suffix[len - 1] = len;
+
+	for(int i = len - 2; i >= 0; --i)
+	{
+		int j = i;
+		for(; pattern[j] == pattern[len - 1 - i + j] && j >= 0; --j);
+		suffix[i] = i - j;
+	}
+
+	return suffix;
+}
+
+int* CreateGS(char* pattern, int len)
+{
+	int* suffix = CreateSuffix(pattern, len);
+	int* gs = new int[len - 1];
+
+	for(int i = 1; i < len - 1; ++i)
+	{
+		gs[i] = len;
+	}
+
+	for(int i = len - 2; i > 0; --i)
+	{
+		for(int j = 0; j < len; ++j)
+		{
+			if(suffix[j] == len - 1 - i)
+			{
+				gs[i] = len - 1 - j; 
+			}
+		}
+	}
+
+	for(int i = 0; i < len - 1; ++i)
+	{
+		gs[len - 1 - suffix[i]] = len - 1 - i;
+	}
+
+	return gs;
+}
+
+int bm_search(char* text, int text_len, char* pattern, int pattern_len)
+{
+	int* bc = CreateBC(pattern, pattern_len);
+	int* gs = CreateGS(pattern, pattern_len);
+
+	for(int i = 0; i <= text_len - pattern_len; )
+	{
+		int j = pattern_len - 1;
+		for(; j >= 0 && text[i + j] == pattern[j]; --j)
+		{
+			cout << " text: " << text[i+j] << ", pattern: " << pattern[j] << endl;
+		}
+		if(j < 0)
+		{
+			return i;
+		}
+		int bad_char_index = i + j;
+		int bc_move = bad_char_index - bc[text[bad_char_index]];
+		if(bc_move < 0)
+		{
+			bc_move = bad_char_index + 1 - i;
+		}
+		int gs_move = gs[bad_char_index];
+		int move = (bc_move > gs_move ? bc_move : gs_move);
+
+		i += move;
+	}
+
+	if(bc != NULL)
+	{
+		delete bc;
+		bc = NULL;
+	}
+
+	if(gs != NULL)
+	{
+		delete bc;
+		gs = NULL;
+	}
+	return -1;
+}
