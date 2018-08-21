@@ -165,6 +165,13 @@ int* CreateBC(char* pattern, int len)
 		bc[pattern[i]] = i;
 	}
 
+	for(int i = 0; i < 256; ++i)
+	{
+		if(bc[i] != -1)
+		{
+			cout << "bc[" << i << "] = " << bc[i] << endl;
+		}
+	}
 	return bc;
 }
 
@@ -178,6 +185,11 @@ int* CreateSuffix(char* pattern, int len)
 		int j = i;
 		for(; pattern[j] == pattern[len - 1 - i + j] && j >= 0; --j);
 		suffix[i] = i - j;
+	}
+
+	for(int i = 0; i < len; ++i)
+	{
+		cout << "suffix[" << i << "] = " << suffix[i] << endl;
 	}
 
 	return suffix;
@@ -209,6 +221,11 @@ int* CreateGS(char* pattern, int len)
 		gs[len - 1 - suffix[i]] = len - 1 - i;
 	}
 
+	for(int i = 0; i < len - 1; ++i)
+	{
+		cout << "gs[" << i << "] = " << gs[i] << endl;
+	}
+
 	return gs;
 }
 
@@ -219,22 +236,31 @@ int bm_search(char* text, int text_len, char* pattern, int pattern_len)
 
 	for(int i = 0; i <= text_len - pattern_len; )
 	{
+		cout << "i = " << i << endl;
 		int j = pattern_len - 1;
-		for(; j >= 0 && text[i + j] == pattern[j]; --j)
+		for(; j >= 0 && pattern[j] == text[i + j]; --j)
 		{
-			cout << " text: " << text[i+j] << ", pattern: " << pattern[j] << endl;
+			cout << "pattnern[" << j << "] = " << pattern[j] << " compare to text[" << i+j << "] = " << text[i+j] << endl;
 		}
 		if(j < 0)
 		{
 			return i;
 		}
-		int bad_char_index = i + j;
-		int bc_move = bad_char_index - bc[text[bad_char_index]];
+		int bad_char_index = j;
+		char bad_char = text[i + j];
+		cout << "bad_char = " << bad_char << endl;
+		cout << "bad_char_index = " << bad_char_index << endl;
+
+		int bc_move = bad_char_index - bc[bad_char];
 		if(bc_move < 0)
 		{
-			bc_move = bad_char_index + 1 - i;
+			bc_move = bad_char_index + 1;
 		}
-		int gs_move = gs[bad_char_index];
+
+		int gs_move = gs[bad_char];
+
+		cout << "bc_move = " << bc_move << endl;
+		cout << "gs_move = " << gs_move << endl;
 		int move = (bc_move > gs_move ? bc_move : gs_move);
 
 		i += move;
