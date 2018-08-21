@@ -205,13 +205,16 @@ int* CreateGS(char* pattern, int len)
 		gs[i] = len;
 	}
 
-	for(int i = len - 2; i > 0; --i)
+	for(int i = len - 1; i >= 0; --i)
 	{
-		for(int j = 0; j < len; ++j)
+		if(suffix[i] = i + 1)
 		{
-			if(suffix[j] == len - 1 - i)
+			for(int j = 0; j < len - 1 - i; ++j)
 			{
-				gs[i] = len - 1 - j; 
+				if(gs[j] == len)
+				{
+					gs[j] = len - 1 - i;
+				}
 			}
 		}
 	}
