@@ -132,8 +132,8 @@ int main(int argc, char const *argv[])
 	cout << "signed char, std::int8_t: " << std::is_same<signed char,std::int8_t>::value << std::endl;
 	*/
 
-	char text[] = "`19274jdf.x,xnajl;px[-=9]k;hktk697[u/.gkgjt";
-	char pattern[] = "9]k;hktk";
+	char text[] = "HhqN5pHTuP63vV+/foSEhHD//n1WrFhBamoqDg4OBsc8vF25cmXOnj0LZK+Tm5fNmzfnalu/fj3";
+	char pattern[] = "g4OBsc";
 	int res = bm_search(text, strlen(text), pattern, strlen(pattern));
 	cout << "text = " << text << endl;
 	cout << "pattern = " << pattern << endl;

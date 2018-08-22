@@ -198,20 +198,29 @@ int* CreateSuffix(char* pattern, int len)
 int* CreateGS(char* pattern, int len)
 {
 	int* suffix = CreateSuffix(pattern, len);
-	int* gs = new int[len - 1];
-
-	for(int i = 1; i < len - 1; ++i)
+	int* gs = new int[len];
+	/*
+	在计算gs数组时，从移动数最大的情况依次到移动数最少的情况赋值，
+	确保在合理的移动范围内，移动最少的距离，避免失配的情况。
+	*/
+	for(int i = 1; i < len; ++i)
 	{
 		gs[i] = len;
 	}
 
-	for(int i = len - 1; i >= 0; --i)
+	for(int i = 0; i < len; ++i)
 	{
-		if(suffix[i] = i + 1)
+		cout << "gs[" << i << "] = " << gs[i] << endl;
+	}
+	cout << "----------" << endl;
+
+	for(int i = len - 1; i >= 0; --i) //从右往左扫描，确保模式串移动最少。
+	{
+		if(suffix[i] == i + 1) //是一个与好后缀匹配的最大前缀
 		{
 			for(int j = 0; j < len - 1 - i; ++j)
 			{
-				if(gs[j] == len)
+				if(gs[j] == len) //gs[j]初始值为len, 这样确保gs[j]只被修改一次
 				{
 					gs[j] = len - 1 - i;
 				}
@@ -219,15 +228,22 @@ int* CreateGS(char* pattern, int len)
 		}
 	}
 
+	for(int i = 0; i < len; ++i)
+	{
+		cout << "gs[" << i << "] = " << gs[i] << endl;
+	}
+	cout << "----------" << endl;
+
 	for(int i = 0; i < len - 1; ++i)
 	{
 		gs[len - 1 - suffix[i]] = len - 1 - i;
 	}
 
-	for(int i = 0; i < len - 1; ++i)
+	for(int i = 0; i < len; ++i)
 	{
 		cout << "gs[" << i << "] = " << gs[i] << endl;
 	}
+	cout << "----------" << endl;
 
 	return gs;
 }
@@ -241,14 +257,13 @@ int bm_search(char* text, int text_len, char* pattern, int pattern_len)
 	{
 		cout << "i = " << i << endl;
 		int j = pattern_len - 1;
-		for(; j >= 0 && pattern[j] == text[i + j]; --j)
-		{
-			cout << "pattnern[" << j << "] = " << pattern[j] << " compare to text[" << i+j << "] = " << text[i+j] << endl;
-		}
+		for(; j >= 0 && pattern[j] == text[i+j]; --j);
+
 		if(j < 0)
 		{
 			return i;
 		}
+
 		int bad_char_index = j;
 		char bad_char = text[i + j];
 		cout << "bad_char = " << bad_char << endl;
@@ -260,7 +275,7 @@ int bm_search(char* text, int text_len, char* pattern, int pattern_len)
 			bc_move = bad_char_index + 1;
 		}
 
-		int gs_move = gs[bad_char];
+		int gs_move = gs[bad_char_index];
 
 		cout << "bc_move = " << bc_move << endl;
 		cout << "gs_move = " << gs_move << endl;
