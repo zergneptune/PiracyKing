@@ -165,13 +165,6 @@ int* CreateBC(char* pattern, int len)
 		bc[pattern[i]] = i;
 	}
 
-	for(int i = 0; i < 256; ++i)
-	{
-		if(bc[i] != -1)
-		{
-			cout << "bc[" << i << "] = " << bc[i] << endl;
-		}
-	}
 	return bc;
 }
 
@@ -185,11 +178,6 @@ int* CreateSuffix(char* pattern, int len)
 		int j = i;
 		for(; pattern[j] == pattern[len - 1 - i + j] && j >= 0; --j);
 		suffix[i] = i - j;
-	}
-
-	for(int i = 0; i < len; ++i)
-	{
-		cout << "suffix[" << i << "] = " << suffix[i] << endl;
 	}
 
 	return suffix;
@@ -208,12 +196,6 @@ int* CreateGS(char* pattern, int len)
 		gs[i] = len;
 	}
 
-	for(int i = 0; i < len; ++i)
-	{
-		cout << "gs[" << i << "] = " << gs[i] << endl;
-	}
-	cout << "----------" << endl;
-
 	for(int i = len - 1; i >= 0; --i) //从右往左扫描，确保模式串移动最少。
 	{
 		if(suffix[i] == i + 1) //是一个与好后缀匹配的最大前缀
@@ -228,22 +210,10 @@ int* CreateGS(char* pattern, int len)
 		}
 	}
 
-	for(int i = 0; i < len; ++i)
-	{
-		cout << "gs[" << i << "] = " << gs[i] << endl;
-	}
-	cout << "----------" << endl;
-
 	for(int i = 0; i < len - 1; ++i)
 	{
 		gs[len - 1 - suffix[i]] = len - 1 - i;
 	}
-
-	for(int i = 0; i < len; ++i)
-	{
-		cout << "gs[" << i << "] = " << gs[i] << endl;
-	}
-	cout << "----------" << endl;
 
 	return gs;
 }
@@ -266,8 +236,6 @@ int bm_search(char* text, int text_len, char* pattern, int pattern_len)
 
 		int bad_char_index = j;
 		char bad_char = text[i + j];
-		cout << "bad_char = " << bad_char << endl;
-		cout << "bad_char_index = " << bad_char_index << endl;
 
 		int bc_move = bad_char_index - bc[bad_char];
 		if(bc_move < 0)
@@ -277,8 +245,6 @@ int bm_search(char* text, int text_len, char* pattern, int pattern_len)
 
 		int gs_move = gs[bad_char_index];
 
-		cout << "bc_move = " << bc_move << endl;
-		cout << "gs_move = " << gs_move << endl;
 		int move = (bc_move > gs_move ? bc_move : gs_move);
 
 		i += move;
@@ -296,4 +262,56 @@ int bm_search(char* text, int text_len, char* pattern, int pattern_len)
 		gs = NULL;
 	}
 	return -1;
+}
+
+int getSum(int n)
+{
+	int tmpt = n;
+	bool bRet = (tmpt > 0) && (n += getSum(n-1));
+	return n;
+}
+
+int (*getSumFunc[2])(int n);
+int fun0(int n){ return 0; }
+int fun1(int n){ return n + getSumFunc[!!n](n-1); }
+int getSum_2(int n)
+{
+	getSumFunc[0] = fun0;
+	getSumFunc[1] = fun1;
+
+	int nRet = fun1(100);
+	return nRet;
+}
+
+void T1(int& X, int Y, int i)
+{
+	bool bRet = (Y & (1<<i)) && (X+=(Y<<i));
+}
+
+int getSum_3(int n)
+{
+	#define T(X, Y, i) (Y & (1<<i)) && (X+=(Y<<i))
+
+	int temp = n;
+	T(temp, n, 0);T(temp, n, 1);T(temp, n, 2);T(temp, n, 3);
+	T(temp, n, 4);T(temp, n, 5);T(temp, n, 6);T(temp, n, 7);
+	T(temp, n, 8);T(temp, n, 9);T(temp, n, 10);T(temp, n, 11);
+	T(temp, n, 12);T(temp, n, 13);T(temp, n, 14);T(temp, n, 15);
+	T(temp, n, 16);T(temp, n, 17);T(temp, n, 18);T(temp, n, 19);
+	T(temp, n, 20);T(temp, n, 21);T(temp, n, 22);T(temp, n, 23);
+	T(temp, n, 24);T(temp, n, 25);T(temp, n, 26);T(temp, n, 27);
+	T(temp, n, 28);T(temp, n, 29);T(temp, n, 30);T(temp, n, 31);
+	return temp>>1;
+}
+
+int GetSum::sum = 0;
+int GetSum::n = 0;
+
+int lastNumberOfCircle(int n, int m)
+{
+	if(n == 1)
+	{
+		return 0;
+	}
+	return (lastNumberOfCircle(n-1, m) + m) % n;
 }
