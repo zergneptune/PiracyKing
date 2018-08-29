@@ -185,6 +185,16 @@ private:
 	int m_day{0};
 };
 
+class GetSum
+{
+public:
+	GetSum(){ ++n; sum += n; };
+	int getSum(){ return sum; }
+private:
+	static int sum;
+	static int n;
+};
+
 void CreateDeque(BinaryTreeNode* pCurrNode, BinaryTreeNode** pDQueHead);
 
 void PrintPath(BinaryTreeNode* pHead, int sum);
@@ -194,3 +204,11 @@ int jump(int row, int col);
 bool isPostOrderOfBST(int a[], int len);
 
 int bm_search(char* text, int text_len, char* pattern, int pattern_len);
+
+int getSum(int n);
+
+int getSum_2(int n);
+
+int getSum_3(int n);
+
+int lastNumberOfCircle(int n, int m);

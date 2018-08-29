@@ -131,13 +131,7 @@ int main(int argc, char const *argv[])
 	cout << "A, C: " << std::is_same<A,C>::value << std::endl;
 	cout << "signed char, std::int8_t: " << std::is_same<signed char,std::int8_t>::value << std::endl;
 	*/
-
-	char text[] = "HhqN5pHTuP63vV+/foSEhHD//n1WrFhBamoqDg4OBsc8vF25cmXOnj0LZK+Tm5fNmzfnalu/fj3";
-	char pattern[] = "g4OBsc";
-	int res = bm_search(text, strlen(text), pattern, strlen(pattern));
-	cout << "text = " << text << endl;
-	cout << "pattern = " << pattern << endl;
-	cout << "res = " << res << endl;
+	cout << lastNumberOfCircle(100, 8) << endl;
 	return 0;
 }
 
