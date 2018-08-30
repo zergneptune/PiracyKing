@@ -131,7 +131,7 @@ int main(int argc, char const *argv[])
 	cout << "A, C: " << std::is_same<A,C>::value << std::endl;
 	cout << "signed char, std::int8_t: " << std::is_same<signed char,std::int8_t>::value << std::endl;
 	*/
-	cout << lastNumberOfCircle(100, 8) << endl;
+	cout << CountOfBinary1(0xffff) << endl;
 	return 0;
 }
 

@@ -315,3 +315,14 @@ int lastNumberOfCircle(int n, int m)
 	}
 	return (lastNumberOfCircle(n-1, m) + m) % n;
 }
+
+int CountOfBinary1(unsigned long a)
+{
+	int res = 0;
+	while(a)
+	{
+		a = (a - 1) & a;
+		++ res;
+	}
+	return res;
+}
