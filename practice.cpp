@@ -1,7 +1,7 @@
 #include "practice.hpp"
 #include <stack>
 using std::stack;
-// test2
+// test4
 int jump(int row, int col)
 {
 	static int arr[4][5] = {
@@ -314,4 +314,15 @@ int lastNumberOfCircle(int n, int m)
 		return 0;
 	}
 	return (lastNumberOfCircle(n-1, m) + m) % n;
+}
+
+int CountOfBinary1(unsigned long a)
+{
+	int res = 0;
+	while(a)
+	{
+		a = (a - 1) & a;
+		++ res;
+	}
+	return res;
 }
