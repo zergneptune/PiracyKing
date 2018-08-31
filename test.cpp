@@ -134,4 +134,3 @@ int main(int argc, char const *argv[])
 	cout << CountOfBinary1(0xffff) << endl;
 	return 0;
 }
-
