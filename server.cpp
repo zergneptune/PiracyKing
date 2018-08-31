@@ -34,7 +34,7 @@ void setnonblocking(int sock)
     }
 }
 
-int create_tcp_server(int port)
+int create_server(int port)
 {
     int i, maxi, listenfd, connfd, sockfd, epfd, nfds, portnumber;
     ssize_t n;
@@ -155,4 +155,8 @@ int create_tcp_server(int port)
     return 0;
 }
 
-
+int main()
+{
+    create_server(10086);
+    return 1;
+}
