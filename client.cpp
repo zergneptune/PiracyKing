@@ -36,32 +36,55 @@ int connect_server(const char* server_ip, int server_port)
 	struct sockaddr_in serveraddr;
 
 	//创建连接套接字
+	cout << "create connfd socket" << endl;
     connfd = socket(AF_INET, SOCK_STREAM, 0);
-    setnonblocking(connfd);
+	if(connfd == -1)
+	{
+		perror("connfd");
+	}
 
     //生成epoll专用的文件描述符
+	cout << "create epfd" << endl;
     epfd = epoll_create(5);
+	if(epfd == -1)
+	{
+		perror("epfd");
+		return 0;
+	}
 
     //设置服务端地址结构
+	cout << "set serveraddr" << endl;
     bzero(&serveraddr, sizeof(serveraddr));
     serveraddr.sin_family = AF_INET;
     inet_aton(server_ip, &(serveraddr.sin_addr));
     serveraddr.sin_port = htons(server_port);
 
     //连接
-    connect(connfd, (struct sockaddr*)&serveraddr, 0);
+	cout << "connect" << endl;
+    int res = connect(connfd, (struct sockaddr*)&serveraddr, sizeof(serveraddr));
+	if(res != 0)
+	{
+		perror("connect");
+		return 0;
+	}
+
+	//设置为非阻塞
+    setnonblocking(connfd);
 
     struct epoll_event ev, events[5];
     ev.data.fd = connfd;
     ev.events |= EPOLLIN|EPOLLET;
+	cout << "add connfd to epfd" << endl;
     epoll_ctl(epfd, EPOLL_CTL_ADD, connfd, &ev);
 
     for( ; ;)
     {
+		cout << "enter:" << endl;
     	gets(text);
     	write(connfd, text, 1024);
 
     	int n_ready = epoll_wait(epfd, events, 5, 500);
+		cout << "n_ready = " << n_ready << endl;
     	for(int i = 0; i < n_ready; ++i)
     	{
     		if(events[i].events & EPOLLIN)
