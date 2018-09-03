@@ -8,6 +8,7 @@
 #include <unistd.h>
 #include <stdio.h>
 #include <errno.h>
+#include <string.h>
 
 using namespace std;
 
@@ -72,7 +73,7 @@ int create_server(int port)
    //设置服务端地址结构
     bzero(&serveraddr, sizeof(serveraddr));
     serveraddr.sin_family = AF_INET;
-    char *local_addr = "127.0.0.1";
+    char local_addr[] = "127.0.0.1";
     inet_aton(local_addr, &(serveraddr.sin_addr));
     serveraddr.sin_port = htons(portnumber);
 
@@ -130,7 +131,7 @@ int create_server(int port)
                     close(sockfd);
                     events[i].data.fd = -1;
                 }
-                line[n] = '/0';
+                line[n] = '\0';
                 cout << "read " << line << endl;
                 //设置用于写操作的文件描述符
                 ev.data.fd = sockfd;
