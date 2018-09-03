@@ -1,16 +1,29 @@
-test : test.o practice.o
-	g++ test.o practice.o -o test
-server : server.o
-	g++ server.o -o server
-client : client.o
-	g++ client.o -o client
-test.o : test.cpp
-	g++ -c test.cpp -std=c++11
-practice.o : practice.cpp
-	g++ -c practice.cpp -std=c++11
-server.o : server.cpp
-	g++ -c server.cpp -std=c++11
-client.o : client.cpp
-	g++ -c client.cpp -std=c++11
-clean :
-	rm server.o client.o test.o practice.o test
+all : test server client
+.PHONY : all
+OBJ1 = test.o practice.o
+OBJ2 = server.o
+OBJ3 = client.o
+
+test : $(OBJ1)
+	g++ $(OBJ1) -o test
+server : $(OBJ2)
+	g++ $(OBJ2) -o server
+client : $(OBJ3)
+	g++ $(OBJ3) -o client
+
+$(OBJ1): %.o: %.cpp
+	g++ -c $< -o $@ -std=c++11
+
+$(OBJ2): %.o: %.cpp
+	g++ -c $< -o $@ -std=c++11
+
+$(OBJ3): %.o: %.cpp
+	g++ -c $< -o $@ -std=c++11
+
+.PHONY : clean_o clean_exe
+
+clean_o :
+	rm *.o 
+
+clean_exe :
+	test server client
