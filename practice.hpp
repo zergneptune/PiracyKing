@@ -214,3 +214,4 @@ int getSum_3(int n);
 int lastNumberOfCircle(int n, int m);
 
 int CountOfBinary1(unsigned long a);
+//testtest
