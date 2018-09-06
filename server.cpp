@@ -1,39 +1,29 @@
 #include "server.hpp"
 #include <iostream>
 #include <sys/socket.h>
-#include <sys/epoll.h>
+//#include <sys/epoll.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
-#include <fcntl.h>
 #include <unistd.h>
 #include <stdio.h>
 #include <errno.h>
 #include <string.h>
+#include "utility.hpp"
+//kqueue
+#include <sys/types.h>
+#include <sys/event.h>
+#include <sys/time.h>
+#define LISTEN_MAX_NUM 10
+#define MAXLINE 1024
 
 using namespace std;
 
+#if 0
 #define MAXLINE 1024
 #define OPEN_MAX 100
 #define LISTENQ 20
 #define SERV_PORT 5000
 #define INFTIM 1000
-
-void setnonblocking(int sock)
-{
-    int opts;
-    opts=fcntl(sock,F_GETFL);
-    if(opts<0)
-    {
-        perror("fcntl(sock,GETFL)");
-        exit(1);
-    }
-    opts = opts|O_NONBLOCK;
-    if(fcntl(sock, F_SETFL, opts)<0)
-    {
-        perror("fcntl(sock, SETFL, opts)");
-        exit(1);
-    }
-}
 
 int create_server(int port)
 {
@@ -154,6 +144,122 @@ int create_server(int port)
         }
     }
     return 0;
+}
+#endif
+
+//将事件注册到kqueue
+void RegisterEvent(int kq, int fd, int filters, int flags)
+{
+    struct kevent changes[1];
+    EV_SET(&changes[0], fd, filters, flags, 0, 0, NULL);
+    kevent(kq, changes, 1, NULL, 0, NULL);
+}
+
+int create_server(int port)
+{
+    int listenfd, connfd, sockfd, n_ready, n_read;
+    struct sockaddr_in clientaddr;
+    struct sockaddr_in serveraddr;
+    socklen_t clilen;
+
+    char line[MAXLINE];
+
+    if( port < 0 )
+    {
+        fprintf(stderr,"port: %d/a/n", port);
+        return 1;
+    }
+
+    int kq = kqueue(); // kqueue对象
+    if(kq < 0)
+    {
+        perror("kqueue");
+        return 0;
+    }
+ 
+    // kqueue的事件结构体，不需要直接操作
+    struct kevent events[LISTEN_MAX_NUM]; // kevent返回的事件列表
+
+    //1. 创建监听套接字
+    listenfd = socket(AF_INET, SOCK_STREAM, 0);
+
+    //2. 注册读事件
+    RegisterEvent(kq, connfd, EVFILT_READ, EV_ADD | EV_ENABLE);
+
+
+    //3. 设置服务端地址结构
+    bzero(&serveraddr, sizeof(serveraddr));
+    serveraddr.sin_family = AF_INET;
+    char local_addr[] = "127.0.0.1";
+    inet_aton(local_addr, &(serveraddr.sin_addr));
+    serveraddr.sin_port = htons(port);
+
+    //4. 绑定监听套接字
+    bind(listenfd, (sockaddr *)&serveraddr, sizeof(serveraddr));
+
+    //5. 开始监听
+    listen(listenfd, LISTEN_MAX_NUM);
+
+    for( ; ; )
+    {
+        //等待事件
+        n_ready = kevent(kq, NULL, 0, events, LISTEN_MAX_NUM, NULL);
+        if(n_ready <= 0)
+        {
+            perror("kevent");
+            return 0;
+        }
+
+        for(int i = 0; i < n_ready; ++i)
+        {
+            struct kevent event = events[i];
+            int sockfd = *((int*)event.udata);
+            /*******************************/
+            int sockfd_2 = event.ident;
+
+            if(event.flags & EV_ERROR)
+            {
+                cerr << "event error." << endl;
+                continue;
+            }
+
+            if(sockfd == listenfd && event.filter & EVFILT_READ)
+            {
+                connfd = accept(listenfd, (sockaddr *)&clientaddr, &clilen);
+                if(connfd<0){
+                    perror("connfd<0");
+                    exit(1);
+                }
+
+                setnonblocking(connfd);
+                char *str = inet_ntoa(clientaddr.sin_addr);
+                cout << "accapt a connection from " << str << endl;
+
+                //注册读事件
+                RegisterEvent(kq, sockfd, EVFILT_READ, EV_ADD | EV_ENABLE);
+            }
+            else if(event.filter & EVFILT_READ)
+            {
+                n_read = read(sockfd, line, MAXLINE);
+                line[n_read] = '\0';
+
+                //注册写事件
+                RegisterEvent(kq, sockfd, EVFILT_WRITE, EV_ADD | EV_ENABLE);
+            }
+            else if(event.filter & EVFILT_WRITE)
+            {
+                write(sockfd, line, n_read);
+                //注销写事件，防止一直写
+                RegisterEvent(kq, sockfd, EVFILT_WRITE, EV_DISABLE);
+            }
+            else if(event.filter & EVFILT_EXCEPT)
+            {
+                cerr << "event exception, deleted from kqueue." << endl;
+                RegisterEvent(kq, sockfd, EVFILT_READ | EVFILT_WRITE, EV_DELETE);
+            }
+        }
+    }
+
 }
 
 int main()

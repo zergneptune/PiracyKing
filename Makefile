@@ -3,13 +3,14 @@ all : test server client
 OBJ1 = test.o practice.o
 OBJ2 = server.o
 OBJ3 = client.o
+OBJ4 = utility.o
 
 test : $(OBJ1)
 	g++ $(OBJ1) -o test
-server : $(OBJ2)
-	g++ $(OBJ2) -o server
-client : $(OBJ3)
-	g++ $(OBJ3) -o client
+server : $(OBJ2) $(OBJ4)
+	g++ $(OBJ2) $(OBJ4) -o server
+client : $(OBJ3) $(OBJ4)
+	g++ $(OBJ3) $(OBJ4) -o client
 
 $(OBJ1): %.o: %.cpp
 	g++ -c $< -o $@ -std=c++11
@@ -20,10 +21,15 @@ $(OBJ2): %.o: %.cpp
 $(OBJ3): %.o: %.cpp
 	g++ -c $< -o $@ -std=c++11
 
-.PHONY : clean_o clean_exe
+$(OBJ4): %.o: %.cpp
+	g++ -c $< -o $@ -std=c++11
+
+.PHONY : clean
+
+clean : clean_o clean_exe
 
 clean_o :
 	rm *.o 
 
 clean_exe :
-	test server client
+	rm test server client
