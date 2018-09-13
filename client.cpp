@@ -1,6 +1,5 @@
 #include "client.hpp"
 #include <iostream>
-#include <sys/socket.h>
 //#include <sys/epoll.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
@@ -91,13 +90,19 @@ void RegisterEvent(int kq, int fd, int filters, int flags)
 {
     struct kevent changes[1];
     EV_SET(&changes[0], fd, filters, flags, 0, 0, NULL);
-    kevent(kq, changes, 1, NULL, 0, NULL);
+    int res = kevent(kq, changes, 1, NULL, 0, NULL);
+    if(res < 0)
+    {
+        perror("kevent");
+        exit(1);
+    }
 }
 
 int connect_server(const char* server_ip, int server_port)
 {
 	int connfd;
-	char text[1024];
+	char line[1024];
+    int n_ready, n_read = 0;
 	struct sockaddr_in serveraddr;
 
 	// kqueue的事件结构体
@@ -121,18 +126,22 @@ int connect_server(const char* server_ip, int server_port)
     }
 
     //设置服务端地址结构
-	cout << "set serveraddr" << endl;
+	cout << "set serveraddr: " << server_ip << endl;
+    cout << "port: " << server_port << endl;
     bzero(&serveraddr, sizeof(serveraddr));
     serveraddr.sin_family = AF_INET;
-    inet_aton(server_ip, &(serveraddr.sin_addr));
+    //inet_aton(server_ip, &(serveraddr.sin_addr));
+    serveraddr.sin_addr.s_addr = inet_addr(server_ip);
     serveraddr.sin_port = htons(server_port);
 
     //连接
 	cout << "connect" << endl;
     int res = connect(connfd, (struct sockaddr*)&serveraddr, sizeof(serveraddr));
+    cout << res << errno << endl;
 	if(res != 0)
 	{
 		perror("connect");
+        cout << strerror(errno) << endl;
 		return 0;
 	}
 
@@ -145,8 +154,8 @@ int connect_server(const char* server_ip, int server_port)
     for( ; ;)
     {
 		cout << "enter:" << endl;
-    	gets(text);
-    	write(connfd, text, 1024);
+    	gets(line);
+    	write(connfd, line, 1024);
 
     	//等待事件
         n_ready = kevent(kq, NULL, 0, events, LISTEN_MAX_NUM, NULL);
@@ -163,11 +172,14 @@ int connect_server(const char* server_ip, int server_port)
             
             if(event.filter & EVFILT_READ)
             {
-                n_read = read(sockfd, line, MAXLINE);
+                n_read = read(sockfd, line, 1024);
                 line[n_read] = '\0';
-
-                //注册写事件
-                RegisterEvent(kq, sockfd, EVFILT_WRITE, EV_ADD | EV_ENABLE);
+                cout << "recv from server: " << line << endl;
+            }
+            else if(event.filter & EVFILT_EXCEPT)
+            {
+                cerr << "event exception, deleted from kqueue." << endl;
+                RegisterEvent(kq, sockfd, EVFILT_READ | EVFILT_WRITE, EV_DELETE);
             }
     	}
     }

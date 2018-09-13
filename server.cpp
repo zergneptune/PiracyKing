@@ -1,6 +1,5 @@
 #include "server.hpp"
 #include <iostream>
-#include <sys/socket.h>
 //#include <sys/epoll.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
@@ -152,12 +151,18 @@ void RegisterEvent(int kq, int fd, int filters, int flags)
 {
     struct kevent changes[1];
     EV_SET(&changes[0], fd, filters, flags, 0, 0, NULL);
-    kevent(kq, changes, 1, NULL, 0, NULL);
+    int res = kevent(kq, changes, 1, NULL, 0, NULL);
+    if(res < 0)
+    {
+        perror("kevent");
+        exit(1);
+    }
 }
 
 int create_server(int port)
 {
-    int listenfd, connfd, sockfd, n_ready, n_read;
+    cout << "port: " << port << endl;
+    int listenfd, connfd, sockfd, n_ready, n_read, res;
     struct sockaddr_in clientaddr;
     struct sockaddr_in serveraddr;
     socklen_t clilen;
@@ -166,7 +171,7 @@ int create_server(int port)
 
     if( port < 0 )
     {
-        fprintf(stderr,"port: %d/a/n", port);
+        fprintf(stderr,"port: %d\n", port);
         return 1;
     }
 
@@ -177,32 +182,47 @@ int create_server(int port)
         return 0;
     }
  
-    // kqueue的事件结构体，不需要直接操作
+    // kqueue的事件结构体
     struct kevent events[LISTEN_MAX_NUM]; // kevent返回的事件列表
 
     //1. 创建监听套接字
     listenfd = socket(AF_INET, SOCK_STREAM, 0);
+    if(listenfd < 0)
+    {
+        perror("socket");
+        exit(1);
+    }
+
+    setreuseaddr(listenfd);
 
     //2. 注册读事件
-    RegisterEvent(kq, connfd, EVFILT_READ, EV_ADD | EV_ENABLE);
-
+    RegisterEvent(kq, listenfd, EVFILT_READ, EV_ADD | EV_ENABLE);
 
     //3. 设置服务端地址结构
     bzero(&serveraddr, sizeof(serveraddr));
     serveraddr.sin_family = AF_INET;
-    char local_addr[] = "127.0.0.1";
-    inet_aton(local_addr, &(serveraddr.sin_addr));
+    //char local_addr[] = "127.0.0.1";
+    //inet_aton(local_addr, &(serveraddr.sin_addr));
+    serveraddr.sin_addr.s_addr = htonl( INADDR_ANY ); 
     serveraddr.sin_port = htons(port);
 
     //4. 绑定监听套接字
-    bind(listenfd, (sockaddr *)&serveraddr, sizeof(serveraddr));
+    bind(listenfd, (struct sockaddr *)&serveraddr, sizeof(serveraddr));
+    cout << "errno: " << errno << endl;
 
     //5. 开始监听
-    listen(listenfd, LISTEN_MAX_NUM);
+    cout << "start listen" << endl;
+    res = listen(listenfd, LISTEN_MAX_NUM);
+    if(res < 0)
+    {
+        perror("listen");
+        exit(1);
+    }
 
     for( ; ; )
     {
         //等待事件
+        cout << "wait for event" << endl;
         n_ready = kevent(kq, NULL, 0, events, LISTEN_MAX_NUM, NULL);
         if(n_ready <= 0)
         {
@@ -225,7 +245,7 @@ int create_server(int port)
 
             if(sockfd == listenfd && event.filter & EVFILT_READ)
             {
-                connfd = accept(listenfd, (sockaddr *)&clientaddr, &clilen);
+                connfd = accept(listenfd, (struct sockaddr *)&clientaddr, &clilen);
                 if(connfd<0){
                     perror("connfd<0");
                     exit(1);
@@ -264,6 +284,9 @@ int create_server(int port)
 
 int main()
 {
-    create_server(10086);
+    int port;
+    cout << "input port: ";
+    cin >> port;
+    create_server(port);
     return 1;
 }
