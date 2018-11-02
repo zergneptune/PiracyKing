@@ -1,4 +1,5 @@
 #include "utility.hpp"
+#include <iostream>
 #include <sys/socket.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -31,5 +32,4 @@ void setreuseaddr(int sock)
         exit(1);
     }
 }
-
 

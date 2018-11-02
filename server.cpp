@@ -12,7 +12,7 @@
 #include <sys/types.h>
 #include <sys/event.h>
 #include <sys/time.h>
-#define LISTEN_MAX_NUM 10
+#define LISTEN_MAX_NUM 32
 #define MAXLINE 1024
 
 using namespace std;
@@ -152,46 +152,26 @@ void RegisterEvent(int kq, int fd, int filters, int flags)
     struct kevent changes[1];
     EV_SET(&changes[0], fd, filters, flags, 0, 0, NULL);
     int res = kevent(kq, changes, 1, NULL, 0, NULL);
-    if(res < 0)
-    {
-        perror("kevent");
-        exit(1);
-    }
+    IF_EXIT(res < 0, "kevent");
 }
 
 int create_server(int port)
 {
-    cout << "port: " << port << endl;
     int listenfd, connfd, sockfd, n_ready, n_read, res;
     struct sockaddr_in clientaddr;
     struct sockaddr_in serveraddr;
     socklen_t clilen;
-
     char line[MAXLINE];
 
-    if( port < 0 )
-    {
-        fprintf(stderr,"port: %d\n", port);
-        return 1;
-    }
-
     int kq = kqueue(); // kqueue对象
-    if(kq < 0)
-    {
-        perror("kqueue");
-        return 0;
-    }
+    IF_EXIT(kq <= 0, "kqueue");
  
     // kqueue的事件结构体
     struct kevent events[LISTEN_MAX_NUM]; // kevent返回的事件列表
 
     //1. 创建监听套接字
     listenfd = socket(AF_INET, SOCK_STREAM, 0);
-    if(listenfd < 0)
-    {
-        perror("socket");
-        exit(1);
-    }
+    IF_EXIT(listenfd <= 0, "socket");
 
     setreuseaddr(listenfd);
 
@@ -201,81 +181,75 @@ int create_server(int port)
     //3. 设置服务端地址结构
     bzero(&serveraddr, sizeof(serveraddr));
     serveraddr.sin_family = AF_INET;
-    //char local_addr[] = "127.0.0.1";
-    //inet_aton(local_addr, &(serveraddr.sin_addr));
-    serveraddr.sin_addr.s_addr = htonl( INADDR_ANY ); 
+    serveraddr.sin_addr.s_addr = INADDR_ANY;
     serveraddr.sin_port = htons(port);
 
     //4. 绑定监听套接字
-    bind(listenfd, (struct sockaddr *)&serveraddr, sizeof(serveraddr));
-    cout << "errno: " << errno << endl;
+    res = ::bind(listenfd, (struct sockaddr *)&serveraddr, sizeof(struct sockaddr));
+    IF_EXIT(res < 0, "bind");
 
     //5. 开始监听
     cout << "start listen" << endl;
     res = listen(listenfd, LISTEN_MAX_NUM);
-    if(res < 0)
-    {
-        perror("listen");
-        exit(1);
-    }
+    IF_EXIT(res < 0, "listen");
 
     for( ; ; )
     {
         //等待事件
         cout << "wait for event" << endl;
         n_ready = kevent(kq, NULL, 0, events, LISTEN_MAX_NUM, NULL);
-        if(n_ready <= 0)
-        {
-            perror("kevent");
-            return 0;
-        }
+        IF_EXIT(n_ready <= 0, "kevent");
 
         for(int i = 0; i < n_ready; ++i)
         {
             struct kevent event = events[i];
-            int sockfd = *((int*)event.udata);
-            /*******************************/
-            int sockfd_2 = event.ident;
-
-            if(event.flags & EV_ERROR)
+            int sockfd = event.ident;
+            if(event.flags & EV_ERROR || event.flags & EV_EOF)
             {
                 cerr << "event error." << endl;
+                close(sockfd);
                 continue;
             }
-
-            if(sockfd == listenfd && event.filter & EVFILT_READ)
+            if(sockfd == listenfd && event.filter == EVFILT_READ)
             {
                 connfd = accept(listenfd, (struct sockaddr *)&clientaddr, &clilen);
-                if(connfd<0){
-                    perror("connfd<0");
-                    exit(1);
-                }
+                IF_EXIT(connfd < 0, "accept");
 
                 setnonblocking(connfd);
                 char *str = inet_ntoa(clientaddr.sin_addr);
                 cout << "accapt a connection from " << str << endl;
 
-                //注册读事件
-                RegisterEvent(kq, sockfd, EVFILT_READ, EV_ADD | EV_ENABLE);
+                //注册读事件，并enable it
+                RegisterEvent(kq, connfd, EVFILT_READ, EV_ADD | EV_ENABLE);
+                //注册写事件，disbale it
+                RegisterEvent(kq, connfd, EVFILT_WRITE, EV_ADD | EV_DISABLE);
             }
-            else if(event.filter & EVFILT_READ)
+            else if(event.filter == EVFILT_READ)
             {
                 n_read = read(sockfd, line, MAXLINE);
+                cout << "n_read = " << n_read << endl;
                 line[n_read] = '\0';
+                cout << "recv from client: " << line << endl;
 
-                //注册写事件
+                //disable读事件，防止一直读
+                RegisterEvent(kq, sockfd, EVFILT_READ, EV_ADD | EV_DISABLE);
+                //enable写事件，准备回复客户端
                 RegisterEvent(kq, sockfd, EVFILT_WRITE, EV_ADD | EV_ENABLE);
+                cout << "debug 1" << endl;
             }
-            else if(event.filter & EVFILT_WRITE)
+            else if(event.filter == EVFILT_WRITE)
             {
-                write(sockfd, line, n_read);
-                //注销写事件，防止一直写
-                RegisterEvent(kq, sockfd, EVFILT_WRITE, EV_DISABLE);
+                cout << "debug 2" << endl;
+                write(sockfd, line, strlen(line));
+                //disable写事件，防止一直写
+                RegisterEvent(kq, sockfd, EVFILT_WRITE, EV_ADD | EV_DISABLE);
+                //enable读事件，准备从客户端读消息
+                RegisterEvent(kq, sockfd, EVFILT_READ, EV_ADD | EV_ENABLE);
             }
-            else if(event.filter & EVFILT_EXCEPT)
+            else if(event.filter == EVFILT_EXCEPT)
             {
                 cerr << "event exception, deleted from kqueue." << endl;
-                RegisterEvent(kq, sockfd, EVFILT_READ | EVFILT_WRITE, EV_DELETE);
+                close(sockfd);
             }
         }
     }

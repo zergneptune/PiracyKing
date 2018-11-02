@@ -91,11 +91,7 @@ void RegisterEvent(int kq, int fd, int filters, int flags)
     struct kevent changes[1];
     EV_SET(&changes[0], fd, filters, flags, 0, 0, NULL);
     int res = kevent(kq, changes, 1, NULL, 0, NULL);
-    if(res < 0)
-    {
-        perror("kevent");
-        exit(1);
-    }
+    IF_EXIT(res < 0, "kevent");
 }
 
 int connect_server(const char* server_ip, int server_port)
@@ -111,39 +107,24 @@ int connect_server(const char* server_ip, int server_port)
 	//创建连接套接字
 	cout << "create connfd socket" << endl;
     connfd = socket(AF_INET, SOCK_STREAM, 0);
-	if(connfd == -1)
-	{
-		perror("socket");
-		return 0;
-	}
+	IF_EXIT(connfd < 0, "socket");
 
     //创建kqueue
 	int kq = kqueue(); // kqueue对象
-    if(kq < 0)
-    {
-        perror("kqueue");
-        return 0;
-    }
+    IF_EXIT(kq < 0, "kqueue");
 
     //设置服务端地址结构
 	cout << "set serveraddr: " << server_ip << endl;
     cout << "port: " << server_port << endl;
     bzero(&serveraddr, sizeof(serveraddr));
     serveraddr.sin_family = AF_INET;
-    //inet_aton(server_ip, &(serveraddr.sin_addr));
     serveraddr.sin_addr.s_addr = inet_addr(server_ip);
     serveraddr.sin_port = htons(server_port);
 
     //连接
 	cout << "connect" << endl;
     int res = connect(connfd, (struct sockaddr*)&serveraddr, sizeof(serveraddr));
-    cout << res << errno << endl;
-	if(res != 0)
-	{
-		perror("connect");
-        cout << strerror(errno) << endl;
-		return 0;
-	}
+    IF_EXIT(res < 0, "connect");
 
 	//设置为非阻塞
     setnonblocking(connfd);
@@ -154,32 +135,36 @@ int connect_server(const char* server_ip, int server_port)
     for( ; ;)
     {
 		cout << "enter:" << endl;
-    	gets(line);
-    	write(connfd, line, 1024);
+        cin.ignore(numeric_limits<std::streamsize>::max(), '\n');
+    	cin.get(line, 1024, '\n');
+    	res = write(connfd, line, strlen(line));
+        IF_EXIT(res < 0, "write");
 
     	//等待事件
         n_ready = kevent(kq, NULL, 0, events, LISTEN_MAX_NUM, NULL);
+        IF_EXIT(n_ready < 0, "kevent");
     	for(int i = 0; i < n_ready; ++i)
     	{
     		struct kevent event = events[i];
             int sockfd = event.ident;
 
-            if(event.flags & EV_ERROR)
+            if(event.flags & EV_ERROR || event.flags & EV_EOF)
             {
                 cerr << "event error." << endl;
                 continue;
             }
             
-            if(event.filter & EVFILT_READ)
+            if(event.filter == EVFILT_READ)
             {
                 n_read = read(sockfd, line, 1024);
                 line[n_read] = '\0';
                 cout << "recv from server: " << line << endl;
             }
-            else if(event.filter & EVFILT_EXCEPT)
+            else if(event.filter == EVFILT_EXCEPT)
             {
                 cerr << "event exception, deleted from kqueue." << endl;
-                RegisterEvent(kq, sockfd, EVFILT_READ | EVFILT_WRITE, EV_DELETE);
+                RegisterEvent(kq, sockfd, EVFILT_READ, EV_DELETE);
+                RegisterEvent(kq, sockfd, EVFILT_WRITE, EV_DELETE);
             }
     	}
     }
