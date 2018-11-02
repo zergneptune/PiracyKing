@@ -131,6 +131,7 @@ int main(int argc, char const *argv[])
 	cout << "A, C: " << std::is_same<A,C>::value << std::endl;
 	cout << "signed char, std::int8_t: " << std::is_same<signed char,std::int8_t>::value << std::endl;
 	*/
-	cout << CountOfBinary1(0xffff) << endl;
+	const char* name = "Jerry";
+	print("i am %d years old, how about you %s?\n", 18, name);
 	return 0;
 }

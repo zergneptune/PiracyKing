@@ -1,5 +1,6 @@
 #include "practice.hpp"
 #include <stack>
+#include <stdarg.h>
 using std::stack;
 // test5
 int jump(int row, int col)
@@ -325,4 +326,39 @@ int CountOfBinary1(unsigned long a)
 		++ res;
 	}
 	return res;
+}
+
+void print(char* fmt, ...)
+{
+
+	va_list argptr;
+	va_start(argptr, fmt);
+	for(char* p = fmt; *p != '\0'; ++p)
+	{
+		if(*p == '%' && *(p+1) != '%')
+		{
+			if(*(p+1) == 'd')
+			{
+				int tmp = va_arg(argptr, int);
+				cout << tmp;
+				++p;
+			}
+			else if(*(p+1) == 's')
+			{
+				const char* tmp = va_arg(argptr, const char*);
+				cout << tmp;
+				++p;
+			}
+			else
+			{
+				cout << *p << *(p+1);
+				++p;
+			}
+		}
+		else
+		{
+			cout << *p;
+		}
+	}
+	va_end(argptr);
 }
