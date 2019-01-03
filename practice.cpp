@@ -1,6 +1,7 @@
 #include "practice.hpp"
 #include <stack>
 #include <stdarg.h>
+#include <unistd.h>
 using std::stack;
 // test5
 int jump(int row, int col)
@@ -361,4 +362,41 @@ void print(char* fmt, ...)
 		}
 	}
 	va_end(argptr);
+}
+
+/*
+ * 获取程序的路径名称
+ */
+char * get_program_path(char *buf,int count)
+{
+	int i=0;
+	int retval = readlink("/proc/self/exe",buf,count-1);
+	if((retval < 0 || retval >= count - 1))
+	{
+	    return NULL;
+	}
+	//添加末尾结束符号
+	buf[retval] = '\0';
+	char *end = strrchr(buf,'/');
+	if(NULL == end)
+	    buf[0] = '\0';
+	else
+	    *end = '\0';
+	return buf;
+}
+
+/*
+ * 获取这个程序的文件名,其实这有点多余,argv[0] 
+ * 就代表这个执行的程序文件名
+ */
+char * get_program_name(char *buf,int count)
+{
+	int retval = readlink("/proc/self/exe",buf,count-1);
+	if((retval < 0 || retval >= count - 1))
+	{
+	    return NULL;
+	}
+	buf[retval] = '\0';
+	//获取指向最后一次出现'/'字符的指针
+	return strrchr(buf,'/');
 }

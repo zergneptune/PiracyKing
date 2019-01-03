@@ -3,8 +3,7 @@
 #include <sstream>
 #include <cstdint>
 #include "practice.hpp"
-using std::cerr;
-
+/*-----------------------*/
 
 #define HAS_MEMBER(member)\
 template<typename T, typename... Args>struct has_member_##member\
@@ -113,6 +112,45 @@ private:
 	std::string m_c;
 };
 
+/*
+** Union of all Lua values
+*/
+typedef union {
+  void *gc;
+  void *p;
+  double n;
+  int b;
+} Value;
+
+
+/*
+** Tagged Values
+*/
+
+#define TValuefields	Value value; int tt
+
+typedef struct lua_TValue {
+  TValuefields;
+} TValue;
+
+typedef union TKey {
+  struct {
+    TValuefields; /* 16B */
+    struct Node *next;  /* 8B */
+  } nk;
+  TValue tvk; /* 16 */
+} TKey;
+
+typedef struct Node {
+  TValue i_val; /* 16 */
+  TKey i_key; /* 24 */
+} Node;
+
+typedef struct tt
+{
+	char* p;	
+}tt;
+
 int main(int argc, char const *argv[])
 {
 	/*
@@ -131,7 +169,31 @@ int main(int argc, char const *argv[])
 	cout << "A, C: " << std::is_same<A,C>::value << std::endl;
 	cout << "signed char, std::int8_t: " << std::is_same<signed char,std::int8_t>::value << std::endl;
 	*/
-	const char* name = "Jerry";
-	print("i am %d years old, how about you %s?\n", 18, name);
-	return 0;
+	printf("sizeof(double) = %lu\n", sizeof(double));
+	printf("sizeof(value) = %lu\n", sizeof(Value));
+	printf("sizeof(TValue) = %lu\n", sizeof(TValue));
+	printf("sizeof(TKey) = %lu\n", sizeof(TKey));
+	printf("sizeof(Node) = %lu\n", sizeof(Node));
+	Node node = {
+		{{NULL}, 0},
+		{{{NULL}, 0, NULL}}
+	};
+	node.i_key.nk.tt = 2;
+	node.i_key.nk.value.n = 100;
+	printf("&node.i_key.tvk = %p\n", &node.i_key.tvk);
+	printf("&node.i_key.nk = %p\n", &node.i_key.nk);
+	printf("&node.i_key.tvk.value = %p\n", &node.i_key.tvk.value);
+	printf("&node.i_key.nk.value = %p\n", &node.i_key.nk.value);
+	printf("node.i_key.tvk.tt = %d\n", node.i_key.tvk.tt);
+	printf("node.i_key.tvk.value.n = %f\n", node.i_key.tvk.value.n);
+	printf("node.i_key.nk.tt = %d\n", node.i_key.nk.tt);
+	printf("node.i_key.nk.value.n = %f\n", node.i_key.nk.value.n);
+
+	tt t = {"abcdefg"};
+	tt* pt = &t;
+	cout << int('a') << endl;
+	cout << *pt->p << endl;
+	cout << int(*pt->p++) << endl;
+	cout << *pt->p << endl;
+    return 0;
 }

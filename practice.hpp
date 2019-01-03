@@ -216,3 +216,11 @@ int lastNumberOfCircle(int n, int m);
 int CountOfBinary1(unsigned long a);
 
 void print(char* fmt, ...);
+
+/*
+** extern int getpagesize();
+*/
+
+char * get_program_path(char *buf,int count);
+
+char * get_program_name(char *buf,int count);

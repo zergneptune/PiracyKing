@@ -1,5 +1,6 @@
 #include "server.hpp"
 #include <iostream>
+#include <thread>
 //#include <sys/epoll.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
@@ -256,11 +257,55 @@ int create_server(int port)
 
 }
 
+struct TaskData
+{
+    TaskData(int n): i(n){}
+    int i;
+};
+
+void test_taskque()
+{
+    CTaskQueue<shared_ptr<TaskData>> que;
+
+    std::thread producer([&que](){
+        for(int i = 0; i < 100; ++i)
+        {
+            que.AddTask(make_shared<TaskData>(i));
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        }
+    });
+
+    std::thread consumer_1([&que](){
+        while(1)
+        {
+            cout << "consumer_1 wait\n";
+            shared_ptr<TaskData> pTask = que.Wait_GetTask();
+            cout << "consumer_1 get\n" << endl;
+            cout << pTask->i << '\n';
+        }
+    });
+
+    std::thread consumer_2([&que](){
+        while(1)
+        {
+            cout << "consumer_2 wait\n";
+            shared_ptr<TaskData> pTask = que.Wait_GetTask();
+            cout << "consumer_2 get\n";
+            cout << pTask->i << '\n';
+        }
+    });
+
+    producer.join();
+    consumer_1.join();
+    consumer_2.join();
+}
+
 int main()
 {
     int port;
     cout << "input port: ";
     cin >> port;
     create_server(port);
-    return 1;
+
+    return 0;
 }
