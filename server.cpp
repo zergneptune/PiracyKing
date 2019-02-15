@@ -1,7 +1,6 @@
 #include "server.hpp"
 #include <iostream>
 #include <thread>
-//#include <sys/epoll.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <unistd.h>
@@ -9,24 +8,153 @@
 #include <errno.h>
 #include <string.h>
 #include "utility.hpp"
-//kqueue
-#include <sys/types.h>
-#include <sys/event.h>
-#include <sys/time.h>
-#define LISTEN_MAX_NUM 32
-#define MAXLINE 1024
 
 using namespace std;
-string str_compile;
 
 #ifdef _WIN32
    //define something for Windows (32-bit and 64-bit, this part is common)
+    #ifdef _WIN64
+        //define something for Windows (64-bit only)
+    #else
+        //define something for Windows (32-bit only)
+    #endif
+#elif __APPLE__
+    #include "TargetConditionals.h"
+    #if TARGET_IPHONE_SIMULATOR
+         // iOS Simulator
+    #elif TARGET_OS_IPHONE
+        // iOS device
+    #elif TARGET_OS_MAC
+        // Other kinds of Mac OS
+        //kqueue
+        #include <sys/types.h>
+        #include <sys/event.h>
+        #include <sys/time.h>
+        #define LISTEN_MAX_NUM 32
+        #define MAXLINE 1024
+
+        //将事件注册到kqueue
+        void RegisterEvent(int kq, int fd, int filters, int flags)
+        {
+            struct kevent changes[1];
+            EV_SET(&changes[0], fd, filters, flags, 0, 0, NULL);
+            int res = kevent(kq, changes, 1, NULL, 0, NULL);
+            IF_EXIT(res < 0, "kevent");
+        }
+
+        int create_server(int port)
+        {
+            int listenfd, connfd, sockfd, n_ready, n_read, res;
+            struct sockaddr_in clientaddr;
+            struct sockaddr_in serveraddr;
+            socklen_t clilen;
+            char line[MAXLINE];
+
+            int kq = kqueue(); // kqueue对象
+            IF_EXIT(kq <= 0, "kqueue");
+         
+            // kqueue的事件结构体
+            struct kevent events[LISTEN_MAX_NUM]; // kevent返回的事件列表
+
+            //1. 创建监听套接字
+            listenfd = socket(AF_INET, SOCK_STREAM, 0);
+            IF_EXIT(listenfd <= 0, "socket");
+
+            setreuseaddr(listenfd);
+
+            //2. 注册读事件
+            RegisterEvent(kq, listenfd, EVFILT_READ, EV_ADD | EV_ENABLE);
+
+            //3. 设置服务端地址结构
+            bzero(&serveraddr, sizeof(serveraddr));
+            serveraddr.sin_family = AF_INET;
+            serveraddr.sin_addr.s_addr = INADDR_ANY;
+            serveraddr.sin_port = htons(port);
+
+            //4. 绑定监听套接字
+            res = ::bind(listenfd, (struct sockaddr *)&serveraddr, sizeof(struct sockaddr));
+            IF_EXIT(res < 0, "bind");
+
+            //5. 开始监听
+            cout << "start listen" << endl;
+            res = listen(listenfd, LISTEN_MAX_NUM);
+            IF_EXIT(res < 0, "listen");
+
+            for( ; ; )
+            {
+                //等待事件
+                cout << "wait for event" << endl;
+                n_ready = kevent(kq, NULL, 0, events, LISTEN_MAX_NUM, NULL);
+                IF_EXIT(n_ready <= 0, "kevent");
+
+                for(int i = 0; i < n_ready; ++i)
+                {
+                    struct kevent event = events[i];
+                    int sockfd = event.ident;
+                    if(event.flags & EV_ERROR || event.flags & EV_EOF)
+                    {
+                        cerr << "event error." << endl;
+                        close(sockfd);
+                        continue;
+                    }
+                    if(sockfd == listenfd && event.filter == EVFILT_READ)
+                    {
+                        connfd = accept(listenfd, (struct sockaddr *)&clientaddr, &clilen);
+                        IF_EXIT(connfd < 0, "accept");
+
+                        setnonblocking(connfd);
+                        char *str = inet_ntoa(clientaddr.sin_addr);
+                        cout << "accapt a connection from " << str << endl;
+
+                        //注册读事件，并enable it
+                        RegisterEvent(kq, connfd, EVFILT_READ, EV_ADD | EV_ENABLE);
+                        //注册写事件，disbale it
+                        RegisterEvent(kq, connfd, EVFILT_WRITE, EV_ADD | EV_DISABLE);
+                    }
+                    else if(event.filter == EVFILT_READ)
+                    {
+                        n_read = read(sockfd, line, MAXLINE);
+                        cout << "n_read = " << n_read << endl;
+                        line[n_read] = '\0';
+                        cout << "recv from client: " << line << endl;
+
+                        //disable读事件，防止一直读
+                        RegisterEvent(kq, sockfd, EVFILT_READ, EV_ADD | EV_DISABLE);
+                        //enable写事件，准备回复客户端
+                        RegisterEvent(kq, sockfd, EVFILT_WRITE, EV_ADD | EV_ENABLE);
+                        cout << "debug 1" << endl;
+                    }
+                    else if(event.filter == EVFILT_WRITE)
+                    {
+                        cout << "debug 2" << endl;
+                        write(sockfd, line, strlen(line));
+                        //disable写事件，防止一直写
+                        RegisterEvent(kq, sockfd, EVFILT_WRITE, EV_ADD | EV_DISABLE);
+                        //enable读事件，准备从客户端读消息
+                        RegisterEvent(kq, sockfd, EVFILT_READ, EV_ADD | EV_ENABLE);
+                    }
+                    else if(event.filter == EVFILT_EXCEPT)
+                    {
+                        cerr << "event exception, deleted from kqueue." << endl;
+                        close(sockfd);
+                    }
+                }
+            }
+        }
+    #else
+        #error "Unknown Apple platform"
+    #endif
+#elif __ANDROID__
+    // android
+#elif __linux__
+    // linux
+    #include <sys/epoll.h>
     #define MAXLINE 1024
     #define OPEN_MAX 100
     #define LISTENQ 20
     #define SERV_PORT 5000
     #define INFTIM 1000
-
+    
     int create_server(int port)
     {
         int i, maxi, listenfd, connfd, sockfd, epfd, nfds, portnumber;
@@ -147,135 +275,6 @@ string str_compile;
         }
         return 0;
     }
-    #ifdef _WIN64
-        //define something for Windows (64-bit only)
-    #else
-        //define something for Windows (32-bit only)
-    #endif
-#elif __APPLE__
-    #include "TargetConditionals.h"
-    #if TARGET_IPHONE_SIMULATOR
-         // iOS Simulator
-    #elif TARGET_OS_IPHONE
-        // iOS device
-    #elif TARGET_OS_MAC
-        // Other kinds of Mac OS
-        //将事件注册到kqueue
-        void RegisterEvent(int kq, int fd, int filters, int flags)
-        {
-            struct kevent changes[1];
-            EV_SET(&changes[0], fd, filters, flags, 0, 0, NULL);
-            int res = kevent(kq, changes, 1, NULL, 0, NULL);
-            IF_EXIT(res < 0, "kevent");
-        }
-
-        int create_server(int port)
-        {
-            int listenfd, connfd, sockfd, n_ready, n_read, res;
-            struct sockaddr_in clientaddr;
-            struct sockaddr_in serveraddr;
-            socklen_t clilen;
-            char line[MAXLINE];
-
-            int kq = kqueue(); // kqueue对象
-            IF_EXIT(kq <= 0, "kqueue");
-         
-            // kqueue的事件结构体
-            struct kevent events[LISTEN_MAX_NUM]; // kevent返回的事件列表
-
-            //1. 创建监听套接字
-            listenfd = socket(AF_INET, SOCK_STREAM, 0);
-            IF_EXIT(listenfd <= 0, "socket");
-
-            setreuseaddr(listenfd);
-
-            //2. 注册读事件
-            RegisterEvent(kq, listenfd, EVFILT_READ, EV_ADD | EV_ENABLE);
-
-            //3. 设置服务端地址结构
-            bzero(&serveraddr, sizeof(serveraddr));
-            serveraddr.sin_family = AF_INET;
-            serveraddr.sin_addr.s_addr = INADDR_ANY;
-            serveraddr.sin_port = htons(port);
-
-            //4. 绑定监听套接字
-            res = ::bind(listenfd, (struct sockaddr *)&serveraddr, sizeof(struct sockaddr));
-            IF_EXIT(res < 0, "bind");
-
-            //5. 开始监听
-            cout << "start listen" << endl;
-            res = listen(listenfd, LISTEN_MAX_NUM);
-            IF_EXIT(res < 0, "listen");
-
-            for( ; ; )
-            {
-                //等待事件
-                cout << "wait for event" << endl;
-                n_ready = kevent(kq, NULL, 0, events, LISTEN_MAX_NUM, NULL);
-                IF_EXIT(n_ready <= 0, "kevent");
-
-                for(int i = 0; i < n_ready; ++i)
-                {
-                    struct kevent event = events[i];
-                    int sockfd = event.ident;
-                    if(event.flags & EV_ERROR || event.flags & EV_EOF)
-                    {
-                        cerr << "event error." << endl;
-                        close(sockfd);
-                        continue;
-                    }
-                    if(sockfd == listenfd && event.filter == EVFILT_READ)
-                    {
-                        connfd = accept(listenfd, (struct sockaddr *)&clientaddr, &clilen);
-                        IF_EXIT(connfd < 0, "accept");
-
-                        setnonblocking(connfd);
-                        char *str = inet_ntoa(clientaddr.sin_addr);
-                        cout << "accapt a connection from " << str << endl;
-
-                        //注册读事件，并enable it
-                        RegisterEvent(kq, connfd, EVFILT_READ, EV_ADD | EV_ENABLE);
-                        //注册写事件，disbale it
-                        RegisterEvent(kq, connfd, EVFILT_WRITE, EV_ADD | EV_DISABLE);
-                    }
-                    else if(event.filter == EVFILT_READ)
-                    {
-                        n_read = read(sockfd, line, MAXLINE);
-                        cout << "n_read = " << n_read << endl;
-                        line[n_read] = '\0';
-                        cout << "recv from client: " << line << endl;
-
-                        //disable读事件，防止一直读
-                        RegisterEvent(kq, sockfd, EVFILT_READ, EV_ADD | EV_DISABLE);
-                        //enable写事件，准备回复客户端
-                        RegisterEvent(kq, sockfd, EVFILT_WRITE, EV_ADD | EV_ENABLE);
-                        cout << "debug 1" << endl;
-                    }
-                    else if(event.filter == EVFILT_WRITE)
-                    {
-                        cout << "debug 2" << endl;
-                        write(sockfd, line, strlen(line));
-                        //disable写事件，防止一直写
-                        RegisterEvent(kq, sockfd, EVFILT_WRITE, EV_ADD | EV_DISABLE);
-                        //enable读事件，准备从客户端读消息
-                        RegisterEvent(kq, sockfd, EVFILT_READ, EV_ADD | EV_ENABLE);
-                    }
-                    else if(event.filter == EVFILT_EXCEPT)
-                    {
-                        cerr << "event exception, deleted from kqueue." << endl;
-                        close(sockfd);
-                    }
-                }
-            }
-
-        }
-    #else
-        #error "Unknown Apple platform"
-    #endif
-#elif __ANDROID__
-    // android
-#elif __linux__
-    // linux
 #elif __unix__ // all unices not caught above
     // Unix
 #elif defined(_POSIX_VERSION)
