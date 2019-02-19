@@ -1,14 +1,23 @@
 #pragma once
+#include <iostream>
 #include <queue>
 #include <memory>
 #include <mutex>
 #include <condition_variable>
+#include <string>
+using std::cin;
+using std::cout;
+
+enum MsgType
+{
+	REGIST = 0,
+	LOGIN = 1,
+	LOGOUT = 2,
+	HEARTBEAT = 3,
+	CHAT = 4
+};
 
 #define IF_EXIT(predict, err) if(predict){ perror(err); exit(1); }
-
-void setnonblocking(int sock);
-
-void setreuseaddr(int sock);
 
 template<typename T>
 class CTaskQueue
@@ -68,6 +77,43 @@ bool CTaskQueue<T>::Empty()
 	std::lock_guard<std::mutex> lck(m_mtx);
 	return m_qTask.empty();
 }
+
+struct TTaskData
+{
+	TTaskData(){}
+	TTaskData(int sockfd, MsgType type, std::string msg): nSockfd(sockfd), msgType(type), strMsg(msg){}
+
+	int nSockfd; 		//发送目标sockfd
+	MsgType msgType; 	//消息类型
+	std::string strMsg; //消息内容
+};
+
+struct TMsgHead
+{
+	TMsgHead(){}
+	TMsgHead(MsgType type, size_t len): msgType(type), szMsgLength(len){}
+
+	MsgType msgType; 	//消息类型
+	size_t szMsgLength; //消息长度
+};
+
+struct TSocketFD
+{
+
+};
+
+void setnonblocking(int sock);
+
+void setreuseaddr(int sock);
+
+int readn(int fd, void *vptr, int n);
+
+int writen(int fd, const void *vptr, int n);
+
+int get_input_number();
+
+std::string get_input_string();
+
 
 
 

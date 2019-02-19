@@ -1,12 +1,10 @@
 #include "server.hpp"
-#include <iostream>
 #include <thread>
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <unistd.h>
 #include <stdio.h>
 #include <errno.h>
-#include <string.h>
 #include "utility.hpp"
 
 using namespace std;
