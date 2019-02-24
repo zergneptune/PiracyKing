@@ -171,8 +171,8 @@ using namespace std;
                 shared_ptr<TTaskData> pTask = m_pQueSendMsg->Wait_GetTask();
                 sockfd = pTask->nSockfd;
                 msgHead.msgType = pTask->msgType;
-                msgHead.szMsgLength = pTask->strMsg.size() + 1;
-                nSendBufferSize = sizeof(TMsgHead) + msgHead.szMsgLength + 1;
+                msgHead.szMsgLength = pTask->strMsg.size();
+                nSendBufferSize = sizeof(TMsgHead) + msgHead.szMsgLength;
                 pSendBuffer = new char[nSendBufferSize];
                 memset(pSendBuffer, 0, sizeof(nSendBufferSize));
                 memcpy(pSendBuffer, &msgHead, sizeof(TMsgHead));
@@ -191,7 +191,8 @@ using namespace std;
             }
         }
 
-        CSocketRecv::CSocketRecv(int* pKq, int* pFd): m_pKq(pKq), m_pServerSockfd(pFd){}
+        CSocketRecv::CSocketRecv(int* pkq, int* pfd, TASK_QUE* ptask): 
+        m_pKq(pkq), m_pServerSockfd(pfd), m_pQueTaskData(ptask){}
 
         CSocketRecv::~CSocketRecv(){}
 
@@ -200,6 +201,12 @@ using namespace std;
             int n_ready = 0;
             int n_ret = 0;
             struct kevent events[LISTEN_MAX_NUM];
+            auto deleter = [](char* p){
+                if( p != NULL)
+                {
+                    delete[] p;
+                }};
+
             //注册读事件
             RegisterEvent(*m_pKq, *m_pServerSockfd, EVFILT_READ, EV_ADD | EV_ENABLE);
             while(1)
@@ -214,46 +221,45 @@ using namespace std;
 
                     if(event.flags & EV_ERROR || event.flags & EV_EOF)
                     {
-                        cerr << "event error." << endl;
+                        cerr << "event error, close it." << endl;
                         close(sockfd); //记得关闭此错误socket文件描述符
                         continue;
                     }
                     
                     if(event.filter == EVFILT_READ)
                     {
-                        char* pBuffer = new char[sizeof(TMsgHead)];
-                        n_ret = readn(sockfd, pBuffer, sizeof(TMsgHead));
+                        std::shared_ptr<char> pBuffer(new char[sizeof(TMsgHead)], deleter);
+                        n_ret = readn(sockfd, pBuffer.get(), sizeof(TMsgHead));
                         if(n_ret < 0)
                         {
-                            cout << "读sockfd失败！" << endl;
+                            cout << "读sockfd失败, errno = " << errno << endl;
+                            struct sockaddr_in serveraddr;
+                            socklen_t addrlen;
+                            getpeername(sockfd, (struct sockaddr*)&serveraddr, &addrlen);
                             close(sockfd);
                             continue;
                         }
 
-                        if(pBuffer != NULL)
-                        {
-                            delete[] pBuffer;
-                            pBuffer = NULL;
-                        }
-
-                        TMsgHead* pMsgHead = reinterpret_cast<TMsgHead*>(pBuffer);
-                        pBuffer = new char[sizeof(pMsgHead->szMsgLength)];
-                        n_ret = readn(sockfd, pBuffer, pMsgHead->szMsgLength);
+                        TMsgHead*   pMsgHead = reinterpret_cast<TMsgHead*>(pBuffer.get());
+                        size_t      szMsgLen = pMsgHead->szMsgLength;
+                        MsgType     msgtype  = pMsgHead->msgType;
+                        pBuffer.reset(new char[szMsgLen + 1], deleter);
+                        memset(pBuffer.get(), 0, szMsgLen + 1);
+                        n_ret = readn(sockfd, pBuffer.get(), szMsgLen);
                         if(n_ret < 0)
                         {
-                            cout << "读sockfd失败！" << endl;
+                            cout << "读sockfd失败, errno = " << errno << endl;
                             close(sockfd);
                             continue;
                         }
 
                         //json解码msg，放入任务队列
-                        cout << "recv: " << pBuffer << endl;
-
-                        if(pBuffer != NULL)
-                        {
-                            delete[] pBuffer;
-                            pBuffer = NULL;
-                        }
+                        cout << "接收到服务器消息: " << pBuffer << endl;
+                        m_pQueTaskData->AddTask(std::make_shared<TTaskData>(
+                                                        string("123"),
+                                                        sockfd,
+                                                        msgtype,
+                                                        string(pBuffer.get())));
                     }
                     else if(event.filter == EVFILT_EXCEPT)
                     {
@@ -264,22 +270,42 @@ using namespace std;
             }
         }
 
-        CTaskProc::CTaskProc(TASK_QUE* pQueSend, TASK_QUE* pQueTask): m_pQueSendMsg(pQueSend), m_pQueTaskData(pQueTask){}
+        CTaskProc::CTaskProc(TASK_QUE* p1, TASK_QUE* p2, EVENT_NOTICE* p3):
+            m_pQueSendMsg(p1), m_pQueTaskData(p2), m_pEventNotice(p3){}
         CTaskProc::~CTaskProc(){}
         void CTaskProc::operator()()
         {
-            shared_ptr<TTaskData> pTask = m_pQueTaskData->Wait_GetTask();
-            TTaskData task;
-            switch(pTask->msgType)
+            while(1)
             {
-                case HEARTBEAT:
-                    cout << "收到心跳任务." << endl;
-                    break;
-                case CHAT:
-                    cout << "收到聊天任务." << endl;
-                    break;
-                default:
-                    break;
+                shared_ptr<TTaskData> pTask = m_pQueTaskData->Wait_GetTask();
+                TEventResult result;
+                switch(pTask->msgType)
+                {
+                    case HEARTBEAT:
+                        cout << "处理心跳任务." << endl;
+                        break;
+                    case REGIST_RSP:
+                        cout << "处理注册结果." << endl;
+                        result.strTaskID = pTask->strTaskID;
+                        result.strResult = pTask->strMsg;
+                        m_pEventNotice->Notice(
+                            pTask->strTaskID,
+                            result);
+                        break;
+                    case LOGIN_RSP:
+                        cout << "处理登录结果." << endl;
+                        result.strTaskID = pTask->strTaskID;
+                        result.strResult = pTask->strMsg;
+                        m_pEventNotice->Notice(
+                            pTask->strTaskID,
+                            result);
+                        break;
+                    case CHAT:
+                        cout << "处理聊天任务." << endl;
+                        break;
+                    default:
+                        break;
+                }
             }
         }
     #else
@@ -366,19 +392,21 @@ using namespace std;
 #endif
 
 CClientMng::CClientMng(): 
-    m_socketRecv(&m_nKq, &m_nServerSockfd),
+    m_socketRecv(&m_nKq, &m_nServerSockfd, &m_queTaskData),
     m_socketSend(&m_queSendMsg, &m_nKq),
-    m_taskProc(&m_queSendMsg, &m_queTaskData){}
+    m_taskProc(&m_queSendMsg, &m_queTaskData, &m_cEventNotice){}
 
 CClientMng::~CClientMng(){}
 
-void CClientMng::system_start()
+void CClientMng::start()
 {
     while(1)
     {
-        printf("1. 登录\n");
-        printf("2. 注册\n");
-        printf("输入：");
+        printf("**********************\r\n");
+        printf("\t1. 登录\n");
+        printf("\t2. 注册\n");
+        printf("**********************\r\n");
+        printf("\t输入: ");
 
         int nInput = get_input_number();
         int nRet = 0;
@@ -402,19 +430,18 @@ void CClientMng::system_start()
                 break;
         }
     }
-
 }
 
 int CClientMng::regist()
 {
-    printf("输入账号：");
+    printf("输入账号: ");
     string strAccount = get_input_string();
     string strPasswd, strPasswdConfirm;
     while(1)
     {
-        printf("输入密码：");
+        printf("输入密码: ");
         strPasswd = get_input_string();
-        printf("确认密码：");
+        printf("确认密码: ");
         strPasswdConfirm = get_input_string();
 
         if(strPasswd != strPasswdConfirm)
@@ -427,29 +454,48 @@ int CClientMng::regist()
         }
     }
 
-    m_queSendMsg.AddTask(make_shared<TTaskData>(m_nServerSockfd,
-                                                REGIST,
-                                                "regist"));
-
+    string strTaskID("123");
+    m_queSendMsg.AddTask(make_shared<TTaskData>(
+                                strTaskID,
+                                m_nServerSockfd,
+                                REGIST,
+                                strAccount + string(",") + strPasswd));
+    TEventResult result;
+    int nRet = m_cEventNotice.WaitNoticeFor(strTaskID, result, 10);
+    if(nRet < 0)
+    {
+        cout << "注册失败！" << endl;
+        return -1;
+    }
     return 0;
 }
 
 int CClientMng::login()
 {
-    printf("输入账号：");
+    printf("输入账号: ");
     string strAccount = get_input_string();
-    printf("输入密码：");
+    printf("输入密码: ");
     string strPasswd = get_input_string();
 
-    m_queSendMsg.AddTask(make_shared<TTaskData>(m_nServerSockfd,
-                                            LOGIN,
-                                            "login"));
-
+    string strTaskID("123");
+    m_queSendMsg.AddTask(make_shared<TTaskData>(
+                                    strTaskID,
+                                    m_nServerSockfd,
+                                    LOGIN,
+                                    strAccount + string(",") + strPasswd));
+    TEventResult result;
+    int nRet = m_cEventNotice.WaitNoticeFor(strTaskID, result, 10);
+    if(nRet < 0)
+    {
+        cout << "登录超时！" << endl;
+        return -1;
+    }
     return 0;
 }
 
 int CClientMng::logout()
 {
+    exit(0);
     return 0;
 }
 
@@ -491,9 +537,9 @@ int main()
 {
 	string IP;
 	int port = 0;
-	std::cout<< "请输入ip:";
+	std::cout<< "请输入ip: ";
 	cin>>IP;
-	std::cout<< "请输入port:";
+	std::cout<< "请输入port: ";
 	cin>>port;
 	//connect_server(IP.c_str(), port);
 
@@ -501,7 +547,7 @@ int main()
 
     clientMng.init(IP, port);
 
-    clientMng.system_start();
+    clientMng.start();
 
 	return 0;
 }

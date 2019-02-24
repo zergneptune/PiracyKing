@@ -6,6 +6,45 @@
 #include <stdlib.h>
 #include <stdio.h>
 
+using std::cin;
+using std::cout;
+
+CSemaphore::CSemaphore(){}
+
+CSemaphore::~CSemaphore(){}
+
+void CSemaphore::Wait()
+{
+    std::unique_lock<std::mutex> lck(m_mtx);
+    m_cv.wait(lck);
+}
+
+int CSemaphore::WaitFor(int ms)
+{
+    std::unique_lock<std::mutex> lck(m_mtx);
+    std::cv_status res = m_cv.wait_for(lck, std::chrono::milliseconds(ms));
+    if(res == std::cv_status::timeout)
+    {
+        return -1;
+    }
+    else
+    {
+        return 0;
+    }
+}
+
+void CSemaphore::NoticeOne()
+{
+    std::unique_lock<std::mutex> lck(m_mtx);
+    m_cv.notify_one();
+}
+
+void CSemaphore::NoticeAll()
+{
+    std::unique_lock<std::mutex> lck(m_mtx);
+    m_cv.notify_all();
+}
+
 void setnonblocking(int sock)
 {
     int opts;

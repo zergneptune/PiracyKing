@@ -28,7 +28,7 @@ using namespace std;
         #include <sys/types.h>
         #include <sys/event.h>
         #include <sys/time.h>
-        #define LISTEN_MAX_NUM 32
+        #define LISTEN_MAX_NUM 1024
         #define MAXLINE 1024
 
         //将事件注册到kqueue
@@ -136,6 +136,244 @@ using namespace std;
                         cerr << "event exception, deleted from kqueue." << endl;
                         close(sockfd);
                     }
+                }
+            }
+        }
+
+        CListenThrFunc::CListenThrFunc(SOCKETFD_QUE* pQueSockFD): m_pQueSockFD(pQueSockFD){}
+        CListenThrFunc::~CListenThrFunc(){}
+
+        void CListenThrFunc::operator()(int port)
+        {
+            int connfd, sockfd, n_ready;
+            struct sockaddr_in clientaddr;
+            struct sockaddr_in serveraddr;
+            socklen_t clilen;
+            struct kevent events[LISTEN_MAX_NUM];
+
+            int kq = kqueue();
+            IF_EXIT(kq <= 0, "kqueue");
+         
+            int listenfd = socket(AF_INET, SOCK_STREAM, 0);
+            IF_EXIT(listenfd <= 0, "socket");
+
+            setreuseaddr(listenfd);
+
+            bzero(&serveraddr, sizeof(serveraddr));
+            serveraddr.sin_family = AF_INET;
+            serveraddr.sin_addr.s_addr = INADDR_ANY;
+            serveraddr.sin_port = htons(port);
+
+            int res = ::bind(listenfd, (struct sockaddr *)&serveraddr, sizeof(struct sockaddr));
+            IF_EXIT(res < 0, "bind");
+
+            res = listen(listenfd, LISTEN_MAX_NUM);
+            IF_EXIT(res < 0, "listen");
+
+            RegisterEvent(kq, listenfd, EVFILT_READ, EV_ADD | EV_ENABLE);
+
+            while(1)
+            {
+                n_ready = kevent(kq, NULL, 0, events, LISTEN_MAX_NUM, NULL);
+                IF_EXIT(n_ready <= 0, "kevent");
+
+                struct kevent event = events[0];
+                sockfd = event.ident;
+                if(event.flags & EV_ERROR || event.flags & EV_EOF)
+                {
+                    cerr << "event error, close it." << endl;
+                    close(sockfd);
+                    continue;
+                }
+
+                if(event.filter == EVFILT_READ)
+                {
+                    connfd = accept(listenfd, (struct sockaddr *)&clientaddr, &clilen);
+                    IF_EXIT(connfd < 0, "accept");
+
+                    setnonblocking(connfd);
+                    char *str = inet_ntoa(clientaddr.sin_addr);
+                    cout << "有新的连接, ip: " << str << endl;
+
+                    //加入队列
+                    m_pQueSockFD->AddTask(TSocketFD(connfd));
+                }
+                else if(event.filter == EVFILT_EXCEPT)
+                {
+                    cerr << "event exception, close it." << endl;
+                    close(sockfd);
+                }
+            }
+        }
+
+        CSocketSend::CSocketSend(TASK_QUE* p): m_pQueSendMsg(p){}
+
+        CSocketSend::~CSocketSend(){}
+
+        void CSocketSend::operator()()
+        {
+            int sockfd = 0;
+            int nRet = 0;
+            int nSendBufferSize = 0;
+            char* pSendBuffer = NULL;
+            TMsgHead msgHead;
+            while(1)
+            {
+                shared_ptr<TTaskData> pTask = m_pQueSendMsg->Wait_GetTask();
+                sockfd = pTask->nSockfd;
+                msgHead.msgType = pTask->msgType;
+                msgHead.szMsgLength = pTask->strMsg.size();
+                nSendBufferSize = sizeof(TMsgHead) + msgHead.szMsgLength;
+                pSendBuffer = new char[nSendBufferSize];
+                memset(pSendBuffer, 0, sizeof(nSendBufferSize));
+                memcpy(pSendBuffer, &msgHead, sizeof(TMsgHead));
+                memcpy(pSendBuffer + sizeof(TMsgHead), pTask->strMsg.c_str(), msgHead.szMsgLength);
+                nRet = writen(pTask->nSockfd, pSendBuffer, nSendBufferSize);
+                if(nRet < 0)
+                {
+                    cout << "发送线程：发送数据失败！" << endl;
+                }
+
+                if(pSendBuffer != NULL)
+                {
+                    delete[] pSendBuffer;
+                    pSendBuffer = NULL;
+                }
+            }
+        }
+
+        CSocketRecv::CSocketRecv(SOCKETFD_QUE* pQueSockFD, TASK_QUE* pTaskData): 
+            m_pQueSockFD(pQueSockFD), m_pQueTaskData(pTaskData){}
+
+        CSocketRecv::~CSocketRecv(){}
+
+        void CSocketRecv::operator()()
+        {
+            int n_ready = 0;
+            int n_ret = 0;
+            struct kevent events[LISTEN_MAX_NUM];
+            TTaskData t_task;
+            TSocketFD t_sockfd;
+
+            int kq = kqueue();
+            IF_EXIT(kq <= 0, "kqueue");
+
+            auto deleter = [](char* p){
+                if( p != NULL)
+                {
+                    delete[] p;
+                }};
+
+            while(1)
+            {
+                struct timespec timeout = { 0, 10 * 1000000};
+                //等待事件
+                n_ready = kevent(kq, NULL, 0, events, LISTEN_MAX_NUM, &timeout);
+                IF_EXIT(n_ready < 0, "kevent");
+                for(int i = 0; i < n_ready; ++i)
+                {
+                    struct kevent event = events[i];
+                    int sockfd = event.ident;
+
+                    if(event.flags & EV_ERROR || event.flags & EV_EOF)
+                    {
+                        cerr << "event error, close it." << endl;
+                        struct sockaddr_in clientaddr;
+                        socklen_t addrlen;
+                        getpeername(sockfd, (struct sockaddr*)&clientaddr, &addrlen);
+                        char* ip = inet_ntoa(clientaddr.sin_addr);
+                        short port = ntohs(clientaddr.sin_port);
+                        printf("客户端 %s:%d 掉线.\n", ip, port);
+                        close(sockfd);
+                        continue;
+                    }
+                    
+                    if(event.filter == EVFILT_READ)
+                    {
+                        std::shared_ptr<char> pBuffer(new char[sizeof(TMsgHead)], deleter);
+                        n_ret = readn(sockfd, pBuffer.get(), sizeof(TMsgHead));
+                        if(n_ret < 0)
+                        {
+                            cout << "读sockfd失败！errno = " << errno << endl;
+                            close(sockfd);
+                            continue;
+                        }
+
+                        TMsgHead* pMsgHead = reinterpret_cast<TMsgHead*>(pBuffer.get());
+                        size_t    szMsgLen = pMsgHead->szMsgLength;
+                        MsgType   msgtype = pMsgHead->msgType;
+                        pBuffer.reset(new char[szMsgLen + 1], deleter);
+                        memset(pBuffer.get(), 0, szMsgLen + 1);
+                        n_ret = readn(sockfd, pBuffer.get(), szMsgLen);
+                        if(n_ret < 0)
+                        {
+                            cout << "读sockfd失败！errno = " << errno << endl;
+                            close(sockfd);
+                            continue;
+                        }
+
+                        //json解码msg，放入任务队列
+                        cout << "接收到客户端的信息: " << pBuffer << endl;
+                        m_pQueTaskData->AddTask(std::make_shared<TTaskData>(
+                                                    string("123"),  //从msg中得到任务id
+                                                    sockfd,
+                                                    msgtype,
+                                                    string(pBuffer.get())));
+                    }
+                    else if(event.filter == EVFILT_EXCEPT)
+                    {
+                        cerr << "event exception." << endl;
+                        close(sockfd);
+                        continue;
+                    }
+                }
+
+                //处理连接套接字
+                while(m_pQueSockFD->Try_GetTask(t_sockfd))
+                {
+                    //注册读事件
+                    RegisterEvent(kq, t_sockfd.sockfd, EVFILT_READ, EV_ADD | EV_ENABLE);
+                }
+            }
+        }
+
+        CTaskProc::CTaskProc(TASK_QUE* pQueSend, TASK_QUE* pQueTask): m_pQueSendMsg(pQueSend), m_pQueTaskData(pQueTask){}
+        CTaskProc::~CTaskProc(){}
+        void CTaskProc::operator()()
+        {
+            while(1)
+            {
+                shared_ptr<TTaskData> pTask = m_pQueTaskData->Wait_GetTask();
+                TTaskData task;
+                switch(pTask->msgType)
+                {
+                    case HEARTBEAT:
+                        cout << "处理客户端心跳." << endl;
+                        break;
+                    case REGIST:
+                        cout << "处理客户端注册请求." << endl;
+                        m_pQueSendMsg->AddTask(make_shared<TTaskData>(
+                            string("123"),  //从msg中得到任务id
+                            pTask->nSockfd,
+                            REGIST_RSP,
+                            "regist success."));
+                        break;
+                    case LOGIN:
+                        cout << "处理客户端登录请求." << endl;
+                        m_pQueSendMsg->AddTask(make_shared<TTaskData>(
+                            string("123"),  //从msg中得到任务id
+                            pTask->nSockfd,
+                            LOGIN_RSP,
+                            "login success."));
+                        break;
+                    case LOGOUT:
+                        cout << "处理客户端登出请求." << endl;
+                        break;
+                    case CHAT:
+                        cout << "处理客户端聊天请求." << endl;
+                        break;
+                    default:
+                        break;
                 }
             }
         }
@@ -324,12 +562,56 @@ void test_taskque()
     consumer_2.join();
 }
 
+CServerMng::CServerMng(): 
+m_socketRecv(&m_queSockFD, &m_queTaskData),
+m_socketSend(&m_queSendMsg),
+m_taskProc(&m_queSendMsg, &m_queTaskData),
+m_listenThrFunc(&m_queSockFD)
+{}
+
+CServerMng::~CServerMng(){}
+
+void CServerMng::start(int port)
+{
+    std::thread listenThread(m_listenThrFunc, port);
+    m_nPort = port;
+    cout << "服务启动，监听端口号：" << port << endl;
+    listenThread.join();
+}
+
+void CServerMng::init()
+{
+    init_thread();
+    cout << "线程初始化成功." << endl;
+}
+
+void CServerMng::init_thread()
+{
+    std::thread socketRecvThread(m_socketRecv);
+    std::thread socketSendThread(m_socketSend);
+    std::thread taskProcThread(m_taskProc);
+
+    socketRecvThread.detach();
+    socketSendThread.detach();
+    taskProcThread.detach();
+}
+
 int main()
 {
-    int port;
+    /*int port;
     cout << "input port: ";
     cin >> port;
-    create_server(port);
+    create_server(port);*/
+
+    int port = 0;
+    cout << "输入监听端口号: ";
+    port = get_input_number();
+
+    CServerMng serverMng;
+
+    serverMng.init();
+
+    serverMng.start(port);
 
     return 0;
 }
