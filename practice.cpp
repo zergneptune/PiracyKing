@@ -400,3 +400,93 @@ char * get_program_name(char *buf,int count)
 	//获取指向最后一次出现'/'字符的指针
 	return strrchr(buf,'/');
 }
+
+/*
+ * 测试键盘输入
+ */
+void test_keyboard_input()
+{
+	fd_set rfds, rs;
+	struct timeval tv;
+
+	int i,r,q,j;
+	struct termios saveterm, nt;
+	char c,buf[32],str[8];
+
+	tcgetattr(0, &saveterm);
+	nt = saveterm;
+
+	nt.c_lflag &= ~ECHO;
+	nt.c_lflag &= ~ISIG;   
+	nt.c_lflag &= ~ICANON; 
+
+	tcsetattr(0, TCSANOW, &nt);
+
+	FD_ZERO(&rs);
+	FD_SET(0, &rs);
+    FD_ZERO(&rfds);
+    FD_SET(0, &rfds);
+	tv.tv_sec=0;
+	tv.tv_usec=0;
+
+	i=0; q=0;
+	while(1)
+	{
+		read(0 , buf+i, 1);
+		sprintf(str, "<%X>", *(buf+i));
+		i++;
+		if(i>31)
+		{
+			write(1,"Too many data\n",14);
+			break;
+		}
+		write(1, str, 4);
+		r = select(0 + 1, &rfds, NULL, NULL, &tv); //0：监听标准输入，若r=1，说明标准输入可读，rfds中标准输入文件描述符会就绪
+		if(r<0)
+		{
+			write(1,"select() error.\n",16);
+			break;
+		}
+		if(r == 1)
+			continue;
+		write(1, "\t", 1);
+		rfds = rs; //恢复rfds，即清除就绪的标准输入文件描述符
+		for(j=0; j < i; j++)
+		{
+			c = buf[j];
+			switch(c)
+			{
+			   	case 27: 
+			   		write(1,"ESC ",4);
+			        break;
+			   	case 9: 
+			   		write(1,"TAB ",4);
+			        break;
+			   	case 32: 
+			   		write(1,"SPACE ",6);
+			        break;
+			    default:
+			    	if(c>=32 && c<127)
+			    		write(1, buf+j, 1);
+			       	else
+			       		write(1,"CTRL ",5);
+			        break;
+			}
+		}
+		write(1, "\n", 1);
+        //确保两次连续的按下ESC键，才退出
+		if(buf[0] == 27 && i == 1)
+		{
+			if(q == 0)
+		    	q = 1;
+			else
+				break;
+		}
+		else
+			q = 0;
+		i = 0;
+	}
+
+	tcsetattr(0, TCSANOW, &saveterm);
+	printf("\n");
+}

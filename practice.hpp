@@ -2,6 +2,7 @@
 #include <iostream>
 #include <string>
 #include <list>
+#include <termios.h>
 using std::string;
 using std::cout;
 using std::endl;
@@ -224,3 +225,5 @@ void print(char* fmt, ...);
 char * get_program_path(char *buf,int count);
 
 char * get_program_name(char *buf,int count);
+
+void test_keyboard_input();

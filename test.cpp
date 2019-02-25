@@ -4,6 +4,12 @@
 #include <cstdint>
 #include <thread>
 #include <chrono>
+#include<stdio.h>
+#include<termios.h>
+#include<fcntl.h>
+ #include <sys/types.h>
+ #include <sys/uio.h>
+ #include <unistd.h>
 #include "practice.hpp"
 /*-----------------------*/
 
@@ -53,66 +59,93 @@ struct A { int x,y; };
 struct B { int x,y; };
 typedef A C;
 
-/////////////////////////////////////////////////////////////
-template<typename... Args>
-void read_line(std::string& buf, Args&&... arg)
+////////////////////////////////////////////////////////////////////
+
+void keyboard()
 {
-	std::istringstream instr(buf);
-	int arr[] = { ((instr >> arg), 0)... };
-	int arr_2[] = { ((std::cout << arg << '\t'), 0)... };
-	std::cout << std::endl;
+    fd_set rfds, rs;
+    struct timeval tv;
+
+    int i,r,q,j,dir;
+    struct termios saveterm, nt;
+    char c,buf[32],str[8];
+
+    tcgetattr(0, &saveterm);
+    nt = saveterm;
+
+    nt.c_lflag &= ~ECHO;
+    nt.c_lflag &= ~ISIG;   
+    nt.c_lflag &= ~ICANON; 
+
+    tcsetattr(0, TCSANOW, &nt);
+
+    FD_ZERO(&rs);
+    FD_SET(0, &rs);
+    FD_ZERO(&rfds);
+    FD_SET(0, &rfds);
+    tv.tv_sec=0;
+    tv.tv_usec=0;
+
+    i = 0; q = 0; dir = 0;
+    while(1)
+    {
+        read(0 , buf+i, 1);
+        sprintf(str, "<%X>", *(buf+i));
+        i++;
+        if(i>31)
+        {
+            write(1,"Too many data\n",14);
+            break;
+        }
+        write(1, str, 4);
+        r = select(0 + 1, &rfds, NULL, NULL, &tv); //0：监听标准输入，若r=1，说明标准输入可读，rfds中标准输入文件描述符会就绪
+        if(r<0)
+        {
+            write(1,"select() error.\n",16);
+            break;
+        }
+        if(r == 1)
+            continue;
+        write(1, "\t", 1);
+        rfds = rs; //恢复rfds，即清除就绪的标准输入文件描述符
+        if(i == 3 && buf[0] == 0x1b && buf[1] == 0x5b)
+        {
+            c = buf[2];
+            switch(c)
+            {
+                case 0x41:
+                    write(1, "上", 3);
+                    break;
+                case 0x42:
+                    write(1, "下", 3);
+                    break;
+                case 0x43:
+                    write(1, "右", 3);
+                    break;
+                case 0x44:
+                    write(1, "左", 3);
+                    break;
+                default:
+                    break;
+            }
+        }
+        write(1, "\n", 1);
+        //确保两次连续的按下ESC键，才退出
+        if(buf[0] == 27 && i == 1)
+        {
+            if(q == 0)
+                q = 1;
+            else
+                break;
+        }
+        else
+            q = 0;
+        i = 0;
+    }
+
+    tcsetattr(0, TCSANOW, &saveterm);
+    printf("\n");
 }
-
-template<typename... Args>
-void read_file(std::ifstream& infile)
-{
-	string buf;
-	if(infile.is_open())
-	{
-		while(getline(infile, buf))
-		{
-			read_line(buf, Args()...);
-		}
-	}
-}
-
-template<typename First, typename... Rest>
-void write_line(std::ofstream& outfile, First&& first, Rest&&... rest)
-{
-	outfile << first << '\t';
-	write_line(outfile, rest...);
-}
-
-template<typename T>
-void write_line(std::ofstream& outfile, T&& arg)
-{
-	outfile << arg << '\n';
-}
-
-class MyClass
-{
-public:
-	MyClass(){}
-	MyClass(int a, double b, std::string c): m_a(a), m_b(b), m_c(c){}
-	~MyClass(){}
-
-	friend std::istream& operator >> (std::istream& in, MyClass& arg)
-	{
-		in >> arg.m_a >> arg.m_b >> arg.m_c;
-		return in;
-	}
-
-	friend std::ostream& operator << (std::ostream& out, MyClass& arg)
-	{
-		out << arg.m_a << '\t' << arg.m_b << '\t' << arg.m_c;
-		return out;
-	}
-
-private:
-	int m_a;
-	double m_b;
-	std::string m_c;
-};
 
 int main(int argc, char const *argv[])
 {
@@ -132,31 +165,6 @@ int main(int argc, char const *argv[])
 	cout << "A, C: " << std::is_same<A,C>::value << std::endl;
 	cout << "signed char, std::int8_t: " << std::is_same<signed char,std::int8_t>::value << std::endl;
 	*/
-	/*std::thread th1([](){
-			int cnt = 1;
-			for(;;){
-				std::cout<< ++cnt << endl;
-				std::this_thread::sleep_for(std::chrono::seconds(1));
-			}});
-	th1.join();*/
-
-	int na, nb, nc;
-	float A, B, C;
-	float revenue;
-	//已知
-	A = 9;
-	na = 50;
-
-	for(nb = 0; nb < 1000; ++nb)
-		for(nc = 0; nc < 1000; ++nc)
-			for(B = 0.5; B < 20; B += 0.5)
-				for(C = 0.5; C < 20; C += 0.5)
-					if( (A - B == 2)\
-						&& (B == 2 * C)\
-						&& (na == 2 * nb)\
-						&& (nb == nc) )
-						revenue = A * na + B * nb + C * nc;
-
-	std::cout << "revenue = " << revenue << endl;
+    keyboard();
     return 0;
 }
