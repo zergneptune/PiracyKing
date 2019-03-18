@@ -1,23 +1,7 @@
 #pragma once
 #include "utility.hpp"
 
-struct TEventResult;
-
 int connect_server(char* server_ip, int server_port);
-
-typedef CTaskQueue<std::shared_ptr<TTaskData>> 	TASK_QUE;
-typedef CTaskQueue<std::shared_ptr<TSocketFD>> 	SOCKETFD_QUE;
-typedef CEventNotice<TEventResult>				EVENT_NOTICE;
-
-struct TEventResult
-{
-	TEventResult(){}
-	TEventResult(std::string id, std::string result):
-		strTaskID(id), strResult(result){}
-
-	std::string strTaskID;
-	std::string strResult;
-};
 
 class CSocketRecv
 {
@@ -76,6 +60,12 @@ public:
 	int logout();
 
 	int init(std::string ip, int port);
+
+	void recv_muticast();
+
+	void recv_broadcast();
+
+	void game_start();
 
 private:
 	

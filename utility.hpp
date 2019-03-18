@@ -22,6 +22,16 @@ enum MsgType
 
 #define IF_EXIT(predict, err) if(predict){ perror(err); exit(1); }
 
+struct TEventResult
+{
+	TEventResult(){}
+	TEventResult(std::string id, std::string result):
+		strTaskID(id), strResult(result){}
+
+	std::string strTaskID;
+	std::string strResult;
+};
+
 class CSemaphore
 {
 public:

@@ -227,3 +227,5 @@ char * get_program_path(char *buf,int count);
 char * get_program_name(char *buf,int count);
 
 void test_keyboard_input();
+
+void printf_format();

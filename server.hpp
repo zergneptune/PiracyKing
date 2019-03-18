@@ -68,6 +68,10 @@ public:
 
 	void init();
 
+	void send_muticast();
+
+	void send_broadcast();
+
 private:
 	void init_thread();
 
@@ -88,6 +92,4 @@ private:
 	TASK_QUE		m_queSendMsg;
 
 	TASK_QUE 		m_queTaskData;
-	
-
 };

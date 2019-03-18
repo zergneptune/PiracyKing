@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <thread>
 #include <chrono>
+#include <list>
 #include<stdio.h>
 #include<termios.h>
 #include<fcntl.h>
@@ -11,8 +12,8 @@
  #include <sys/uio.h>
  #include <unistd.h>
 #include "practice.hpp"
+#include "utility.hpp"
 /*-----------------------*/
-
 #define HAS_MEMBER(member)\
 template<typename T, typename... Args>struct has_member_##member\
 {\
@@ -60,92 +61,573 @@ struct B { int x,y; };
 typedef A C;
 
 ////////////////////////////////////////////////////////////////////
+// 隐藏光标
+#define HIDE_CURSOR() printf("\033[?25l")
+// 显示光标
+#define SHOW_CURSOR() printf("\033[?25h")
 
-void keyboard()
+#define CLOSE_ATTR  "\033[m"
+#define BLACK       "\033[30m"
+#define RED         "\033[31m"
+#define GREEN       "\033[32m"
+#define YELLOW      "\033[33m"
+#define BLUE        "\033[34m"
+#define PURPLE      "\033[35m"
+#define DEEP_GREEN  "\033[36m"
+#define WHITE       "\033[37m"
+
+#define MAP_W 64
+#define MAP_H 32
+
+enum MapType
 {
-    fd_set rfds, rs;
-    struct timeval tv;
+    BLANK = 0,
+    BORDER = 1,
+    SNAKE = 2,
+    FOOD = 3
+};
 
-    int i,r,q,j,dir;
-    struct termios saveterm, nt;
-    char c,buf[32],str[8];
+enum CommandType
+{
+    UNKNOWN = 0,
+    MOVE_FORWARD = 1,
+    MOVE_UP = 2,
+    MOVE_DOWN = 3,
+    MOVE_LEFT = 4,
+    MOVE_RIGHT = 5
+};
 
-    tcgetattr(0, &saveterm);
-    nt = saveterm;
+class CMap
+{
+public:
+    CMap(){}
+    ~CMap(){}
 
-    nt.c_lflag &= ~ECHO;
-    nt.c_lflag &= ~ISIG;   
-    nt.c_lflag &= ~ICANON; 
-
-    tcsetattr(0, TCSANOW, &nt);
-
-    FD_ZERO(&rs);
-    FD_SET(0, &rs);
-    FD_ZERO(&rfds);
-    FD_SET(0, &rfds);
-    tv.tv_sec=0;
-    tv.tv_usec=0;
-
-    i = 0; q = 0; dir = 0;
-    while(1)
+    void init()
     {
-        read(0 , buf+i, 1);
-        sprintf(str, "<%X>", *(buf+i));
-        i++;
-        if(i>31)
+        int i, j = 0;
+        for(i = 0; i < MAP_H; ++i)
         {
-            write(1,"Too many data\n",14);
-            break;
-        }
-        write(1, str, 4);
-        r = select(0 + 1, &rfds, NULL, NULL, &tv); //0：监听标准输入，若r=1，说明标准输入可读，rfds中标准输入文件描述符会就绪
-        if(r<0)
-        {
-            write(1,"select() error.\n",16);
-            break;
-        }
-        if(r == 1)
-            continue;
-        write(1, "\t", 1);
-        rfds = rs; //恢复rfds，即清除就绪的标准输入文件描述符
-        if(i == 3 && buf[0] == 0x1b && buf[1] == 0x5b)
-        {
-            c = buf[2];
-            switch(c)
+            for(j = 0; j < MAP_W; ++j)
             {
-                case 0x41:
-                    write(1, "上", 3);
+                m_map[i][j] = MapType::BLANK; //空白
+                m_overlap[i][j] = 0;
+            }
+        }
+
+        for(i = 0; i < MAP_H; ++i)
+        {
+            m_map[i][0] = MapType::BORDER;
+            m_map[i][MAP_W - 1] = MapType::BORDER;
+        }
+
+        for(j = 0; j < MAP_W; ++j)
+        {
+            m_map[0][j] = MapType::BORDER;
+            m_map[MAP_H - 1][j] = MapType::BORDER;
+        }
+    }
+
+    void refresh(std::string snake_color)
+    {
+        int value = 0;
+        for(int i = 0; i < MAP_H; ++i)
+        {
+            for(int j = 0; j < MAP_W; ++j)
+            {
+                value = m_map[i][j];
+                switch(value)
+                {
+                    case MapType::BORDER:
+                        printf("\033[30m*\033[m");
+                        break;
+                    case MapType::SNAKE:
+                        printf("%s@\033[m", snake_color.c_str());
+                        break;
+                    case MapType::FOOD:
+                        printf("%s$\033[m", GREEN);
+                        break;
+                    default:
+                        printf(" ");
+                }
+            }
+            printf("\n");
+        }
+    }
+
+    int* operator[](int i)
+    {
+        return m_map[i];
+    }
+
+    void inc_overlap(int x, int y)
+    {
+        ++ m_overlap[x][y];
+    }
+
+    void dec_overlap(int x, int y)
+    {
+        -- m_overlap[x][y];
+    }
+
+    int get_overlap(int x, int y)
+    {
+        return m_overlap[x][y];
+    }
+
+private:
+    int             m_map[MAP_H][MAP_W];
+
+    std::string     m_strColor;
+
+    int             m_overlap[MAP_H][MAP_W];
+};
+
+class CFood
+{
+public:
+    CFood(CMap& map): m_map(map), m_strColor(GREEN){}
+    ~CFood(){}
+
+    void random_make()
+    {
+        srand(time(NULL));
+        int cox, coy = 0;
+        while(1)
+        {
+            cox = 1 + rand() % (MAP_H - 2);
+            coy = 1 + rand() % (MAP_W - 2);
+            if(m_map[cox][coy] != MapType::SNAKE)//不为蛇身
+            {
+                break;
+            }
+        }
+        m_map[cox][coy] = MapType::FOOD;//食物
+    }
+
+    void make(int x, int y)
+    {
+        m_cox = x;
+        m_coy = y;
+    }
+
+    void set_color(std::string color)
+    {
+        m_strColor = color;
+    }
+
+    std::string get_color()
+    {
+        return m_strColor;
+    }
+
+private:
+    int             m_cox;
+
+    int             m_coy;
+
+    CMap&           m_map;
+
+    std::string     m_strColor;
+};
+
+class CSnakeNode
+{
+public:
+    CSnakeNode(){}
+    CSnakeNode(int x, int y): m_cox(x), m_coy(y){}
+    ~CSnakeNode(){}
+
+    int m_cox;
+
+    int m_coy;
+};
+
+class CSnake
+{
+public:
+    CSnake(CMap& map, CFood& food): m_map(map), m_food(food), m_strColor(RED){}
+
+    ~CSnake(){}
+
+public:
+
+    void init()
+    {
+        std::lock_guard<std::mutex> lock(m_mt);
+        srand(time(NULL));
+        int cox, coy, value = 0;
+        while(1)
+        {
+            cox = 1 + rand() % (MAP_H - 2);
+            coy = 1 + rand() % (MAP_W - 2);
+            value = m_map[cox][coy];
+            if(value != MapType::SNAKE && value != MapType::FOOD)
+            {
+                if(m_map[cox-1][coy] != MapType::SNAKE && m_map[cox-1][coy] != MapType::FOOD)
+                {
+                    m_map[cox][coy] = MapType::SNAKE;
+                    m_map[cox-1][coy] = MapType::SNAKE;
+                    m_map.inc_overlap(cox, coy);
+                    m_map.inc_overlap(cox-1, coy);
+                    m_snake.push_back(CSnakeNode(cox, coy));
+                    m_snake.push_back(CSnakeNode(cox-1, coy));
                     break;
-                case 0x42:
-                    write(1, "下", 3);
+                }
+                else if(m_map[cox+1][coy] != MapType::SNAKE && m_map[cox+1][coy] != MapType::FOOD)
+                {
+                    m_map[cox][coy] = MapType::SNAKE;
+                    m_map[cox+1][coy] = MapType::SNAKE;
+                    m_map.inc_overlap(cox, coy);
+                    m_map.inc_overlap(cox+1, coy);
+                    m_snake.push_back(CSnakeNode(cox, coy));
+                    m_snake.push_back(CSnakeNode(cox+1, coy));
                     break;
-                case 0x43:
-                    write(1, "右", 3);
+                }
+                else if(m_map[cox][coy-1] != MapType::SNAKE && m_map[cox][coy-1] != MapType::FOOD)
+                {
+                    m_map[cox][coy] = MapType::SNAKE;
+                    m_map[cox][coy-1] = MapType::SNAKE;
+                    m_map.inc_overlap(cox, coy);
+                    m_map.inc_overlap(cox, coy-1);
+                    m_snake.push_back(CSnakeNode(cox, coy));
+                    m_snake.push_back(CSnakeNode(cox, coy-1));
                     break;
-                case 0x44:
-                    write(1, "左", 3);
+                }
+                else if(m_map[cox][coy+1] != MapType::SNAKE && m_map[cox][coy+1] != MapType::FOOD)
+                {
+                    m_map[cox][coy] = MapType::SNAKE;
+                    m_map[cox][coy+1] = MapType::SNAKE;
+                    m_map.inc_overlap(cox, coy);
+                    m_map.inc_overlap(cox, coy+1);
+                    m_snake.push_back(CSnakeNode(cox, coy));
+                    m_snake.push_back(CSnakeNode(cox, coy+1));
+                    break;
+                }
+            }
+        }
+    }
+
+    void move_up()
+    {
+        std::lock_guard<std::mutex> lock(m_mt);
+        auto iter = m_snake.begin();
+        int x1 = iter->m_cox;
+        ++ iter;
+        int x2 = iter->m_cox;
+        if(x1 > x2) //如果蛇正在向下移动，那么禁止向上移动
+        {
+            return;
+        }
+        move_core(-1, 0);
+    }
+
+    void move_down()
+    {
+        std::lock_guard<std::mutex> lock(m_mt);
+        auto iter = m_snake.begin();
+        int x1 = iter->m_cox;
+        ++ iter;
+        int x2 = iter->m_cox;
+        if(x1 < x2) //如果蛇正在向上移动，那么禁止向下移动
+        {
+            return;
+        }
+        move_core(1, 0);
+    }
+
+    void move_left()
+    {
+        std::lock_guard<std::mutex> lock(m_mt);
+        auto iter = m_snake.begin();
+        int y1 = iter->m_coy;
+        ++ iter;
+        int y2 = iter->m_coy;
+        if(y1 > y2) //如果蛇正在向右移动，那么禁止向左移动
+        {
+            return;
+        }
+        move_core(0, -1);
+    }
+
+    void move_right()
+    {
+        std::lock_guard<std::mutex> lock(m_mt);
+        auto iter = m_snake.begin();
+        int y1 = iter->m_coy;
+        ++ iter;
+        int y2 = iter->m_coy;
+        if(y1 < y2) //如果蛇正在向左移动，那么禁止向右移动
+        {
+            return;
+        }
+        move_core(0, 1);
+    }
+
+    void move_forward()
+    {
+        std::lock_guard<std::mutex> lock(m_mt);
+        auto iter = m_snake.begin();
+        int x1 = iter->m_cox;
+        int y1 = iter->m_coy;
+        ++ iter;
+        int x2 = iter->m_cox;
+        int y2 = iter->m_coy;
+        if(x1 > x2)//向下移动
+        {
+            move_core(1, 0);         
+        }
+        else if(x1 < x2)//向上移动
+        {
+            move_core(-1, 0);
+        }
+        else if(y1 > y2)//向右移动
+        {
+            move_core(0, 1);
+        }
+        else
+        {
+            move_core(0, -1);
+        }
+    }
+
+    void set_color(std::string color)
+    {
+        m_strColor = color;
+    }
+
+    std::string get_color()
+    {
+        return m_strColor;
+    }
+
+private:
+    void move_core(int r_x, int r_y) //参数为相对移动距离
+    {
+        auto iter = m_snake.begin();
+        int move_to_x = iter->m_cox + r_x;
+        int move_to_y = iter->m_coy + r_y;
+        iter = m_snake.end();
+        -- iter;
+        int last_x = iter->m_cox;
+        int last_y = iter->m_coy;
+        if(m_map[move_to_x][move_to_y] == MapType::BORDER)
+        {
+            return;
+        }
+        else if(m_map[move_to_x][move_to_y] == MapType::FOOD)
+        {
+            m_snake.push_front(CSnakeNode(move_to_x, move_to_y));
+            m_map[move_to_x][move_to_y] = MapType::SNAKE;
+            m_map.inc_overlap(move_to_x, move_to_y);
+            m_food.random_make();
+            return;
+        }
+
+        m_map.inc_overlap(move_to_x, move_to_y);
+        m_map[move_to_x][move_to_y] = MapType::SNAKE;
+        m_map.dec_overlap(last_x, last_y);//蛇尾离开，减少蛇尾位置重叠数
+        if(m_map.get_overlap(last_x, last_y) < 1)//如果蛇尾位置没有重叠
+        {
+            m_map[last_x][last_y] = MapType::BLANK;
+        }
+        iter->m_cox = move_to_x;
+        iter->m_coy = move_to_y;
+        m_snake.splice(m_snake.begin(), m_snake, iter);
+    }
+
+private:
+    std::list<CSnakeNode> m_snake;
+
+    CMap&           m_map;
+
+    CFood&          m_food;
+
+    std::mutex      m_mt;
+
+    std::string     m_strColor;
+};
+
+class CWorkThreadFunc
+{
+public:
+    CWorkThreadFunc(CTaskQueue<CommandType>& queCmd, CSnake& snake, CMap& map): 
+        m_bToExit(false), m_queCmd(queCmd), m_snake(snake), m_map(map){}
+    ~CWorkThreadFunc(){}
+
+public:
+    void operator()()
+    {
+        m_bToExit = false;
+        CommandType cmd_type = UNKNOWN;
+        while(!m_bToExit)
+        {
+            cmd_type = m_queCmd.Wait_GetTask();
+            switch(cmd_type)
+            {
+                case MOVE_FORWARD:
+                    m_snake.move_forward();
+                    break;
+                case MOVE_UP:
+                    m_snake.move_up();
+                    break;
+                case MOVE_DOWN:
+                    m_snake.move_down();
+                    break;
+                case MOVE_LEFT:
+                    m_snake.move_left();
+                    break;
+                case MOVE_RIGHT:
+                    m_snake.move_right();
                     break;
                 default:
                     break;
             }
+            printf("\x1b[H\x1b[2J");
+            m_map.refresh(m_snake.get_color());
         }
-        write(1, "\n", 1);
-        //确保两次连续的按下ESC键，才退出
-        if(buf[0] == 27 && i == 1)
-        {
-            if(q == 0)
-                q = 1;
-            else
-                break;
-        }
-        else
-            q = 0;
-        i = 0;
     }
 
-    tcsetattr(0, TCSANOW, &saveterm);
-    printf("\n");
-}
+    void set_exit()
+    {
+        m_bToExit = true;
+    }
+
+private:
+    bool m_bToExit;
+
+    CTaskQueue<CommandType>&    m_queCmd;
+
+    CSnake&                     m_snake;
+
+    CMap&                       m_map;
+};
+
+class CGame
+{
+public:
+    CGame(): m_food(m_map), m_snake(m_map, m_food), 
+                m_workFunc(m_queCmd, m_snake, m_map){}
+    ~CGame(){}
+
+public:
+
+    void init()
+    {
+        m_map.init();
+        m_snake.init();
+        m_food.random_make();
+    }
+
+    void start()
+    {
+        std::thread work_thread(m_workFunc);
+        work_thread.detach();
+        bool bExitThread = false;
+        std::thread auto_move_thread([this, &bExitThread](){
+            while(!bExitThread)
+            {
+                m_queCmd.AddTask(MOVE_FORWARD);
+                std::this_thread::sleep_for(std::chrono::milliseconds(200));
+            }
+        });
+
+        HIDE_CURSOR();
+        fd_set rfds, rs;
+        struct timeval tv;
+
+        int i,r,q,j,dir;
+        struct termios saveterm, nt;
+        char c,buf[32],str[8];
+
+        tcgetattr(0, &saveterm);
+        nt = saveterm;
+
+        nt.c_lflag &= ~ECHO;
+        nt.c_lflag &= ~ISIG;   
+        nt.c_lflag &= ~ICANON;
+
+        tcsetattr(0, TCSANOW, &nt);
+
+        FD_ZERO(&rs);
+        FD_SET(0, &rs);
+        FD_ZERO(&rfds);
+        FD_SET(0, &rfds);
+        tv.tv_sec=0;
+        tv.tv_usec=0;
+
+        i = 0; q = 0; dir = 0;
+        while(1)
+        {
+            read(0 , buf+i, 1);
+            i++;
+            if(i>31)
+            {
+                write(1,"Too many data\n",14);
+                break;
+            }
+            //write(1, str, 4);
+            r = select(0 + 1, &rfds, NULL, NULL, &tv); //0：监听标准输入，若r=1，说明标准输入可读，rfds中标准输入文件描述符会就绪
+            if(r<0)
+            {
+                write(1,"select() error.\n",16);
+                break;
+            }
+            if(r == 1)
+                continue;
+            //write(1, "\t", 1);
+            rfds = rs; //恢复rfds，即清除就绪的标准输入文件描述符
+            if(i == 3 && buf[0] == 0x1b && buf[1] == 0x5b)
+            {
+                c = buf[2];
+                switch(c)
+                {
+                    case 0x41:
+                        m_queCmd.AddTask(MOVE_UP);
+                        break;
+                    case 0x42:
+                        m_queCmd.AddTask(MOVE_DOWN);
+                        break;
+                    case 0x43:
+                        m_queCmd.AddTask(MOVE_RIGHT);
+                        break;
+                    case 0x44:
+                        m_queCmd.AddTask(MOVE_LEFT);
+                        break;
+                    default:
+                        break;
+                }
+            }
+            //确保两次连续的按下ESC键，才退出
+            if(buf[0] == 27 && i == 1)
+            {
+                if(q == 0)
+                    q = 1;
+                else
+                    break;
+            }
+            else
+                q = 0;
+            i = 0;
+        }
+
+        tcsetattr(0, TCSANOW, &saveterm);
+        SHOW_CURSOR();
+        bExitThread = true;//退出蛇自动前进的线程
+        auto_move_thread.join();
+    }
+
+private:
+    CMap    m_map;
+
+    CFood   m_food;
+
+    CSnake  m_snake;
+
+    CWorkThreadFunc         m_workFunc;
+
+    CTaskQueue<CommandType> m_queCmd;
+};
 
 int main(int argc, char const *argv[])
 {
@@ -165,6 +647,8 @@ int main(int argc, char const *argv[])
 	cout << "A, C: " << std::is_same<A,C>::value << std::endl;
 	cout << "signed char, std::int8_t: " << std::is_same<signed char,std::int8_t>::value << std::endl;
 	*/
-    keyboard();
+    CGame game;
+    game.init();
+    game.start();
     return 0;
 }

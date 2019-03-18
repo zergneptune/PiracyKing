@@ -377,6 +377,67 @@ using namespace std;
                 }
             }
         }
+
+        void CServerMng::send_muticast()
+        {
+            int res = 0;
+            int sockfd = 0;
+            struct sockaddr_in mcast_addr;
+            sockfd = socket(AF_INET, SOCK_DGRAM, 0);
+            IF_EXIT(sockfd < 0, "socket");
+
+            memset(&mcast_addr, 0, sizeof(mcast_addr));
+            mcast_addr.sin_family = AF_INET;
+            mcast_addr.sin_addr.s_addr = inet_addr("224.0.0.100");/*设置多播IP地址*/
+            mcast_addr.sin_port = htons(10010);/*设置多播端口*/
+
+            char msg[] = "muticast message";
+            while(1)
+            {
+                res = sendto(sockfd,
+                    msg,
+                    sizeof(msg),
+                    0,
+                    (struct sockaddr*)(&mcast_addr),
+                    sizeof(mcast_addr));
+
+                std::cout << "res = " << res << endl;
+                std::this_thread::sleep_for(std::chrono::seconds(1));
+            }
+        }
+
+        void CServerMng::send_broadcast()
+        {
+            int res = 0;
+            int sockfd = 0;
+            struct sockaddr_in bcast_addr;
+            sockfd = socket(AF_INET, SOCK_DGRAM, 0);
+            IF_EXIT(sockfd < 0, "socket");
+
+            memset(&bcast_addr, 0, sizeof(bcast_addr));
+            bcast_addr.sin_family = AF_INET;
+            bcast_addr.sin_addr.s_addr = inet_addr("192.168.2.255");
+            bcast_addr.sin_port = htons(10000);
+
+            //设置套接字广播属性
+            int opt = 1;
+            res = setsockopt(sockfd, SOL_SOCKET, SO_BROADCAST, &opt, sizeof(opt));
+
+            char msg[] = "broadcast message";
+            while(1)
+            {
+                res = sendto(sockfd,
+                    msg,
+                    sizeof(msg),
+                    0,
+                    (struct sockaddr*)(&bcast_addr),
+                    sizeof(bcast_addr));
+
+                std::cout << "res = " << res << endl;
+                std::this_thread::sleep_for(std::chrono::seconds(1));
+            }
+
+        }
     #else
         #error "Unknown Apple platform"
     #endif
@@ -603,7 +664,7 @@ int main()
     cin >> port;
     create_server(port);*/
 
-    int port = 0;
+    /*int port = 0;
     cout << "输入监听端口号: ";
     port = get_input_number();
 
@@ -611,7 +672,11 @@ int main()
 
     serverMng.init();
 
-    serverMng.start(port);
+    serverMng.start(port);*/
 
+    CServerMng serverMng;
+
+    serverMng.send_broadcast();
+    
     return 0;
 }

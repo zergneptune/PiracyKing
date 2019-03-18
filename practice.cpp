@@ -490,3 +490,31 @@ void test_keyboard_input()
 	tcsetattr(0, TCSANOW, &saveterm);
 	printf("\n");
 }
+
+void printf_format()
+{
+	printf("\033[30m黑\033[m\n");
+    printf("\033[31m红\033[m\n");
+    printf("\033[32m绿\033[m\n");
+    printf("\033[33m黄\033[m\n");
+    printf("\033[34m蓝\033[m\n");
+    printf("\033[35m紫\033[m\n");
+    printf("\033[36m深绿\033[m\n");
+    printf("\033[37m白\033[m\n");
+
+    printf("\033[40m背景黑\033[m\n");
+    printf("\033[41m背景红\033[m\n");
+    printf("\033[42m背景绿\033[m\n");
+    printf("\033[43m背景黄\033[m\n");
+    printf("\033[44m背景蓝\033[m\n");
+    printf("\033[45m背景紫\033[m\n");
+    printf("\033[46m背景深绿\033[m\n");
+    printf("\033[47m背景白\033[m\n");
+
+
+    printf("\033[1;31m红,高亮\033[m\n");
+    printf("\033[4;31m红,下划线\033[m\n");
+    printf("\033[5;31m红,闪烁\033[m\n");
+    printf("\033[7;31m红,反显\033[m\n");
+    printf("\033[8;31m红,消隐\033[m\n");
+}

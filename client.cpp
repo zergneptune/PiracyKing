@@ -308,6 +308,102 @@ using namespace std;
                 }
             }
         }
+
+        void CClientMng::recv_muticast()
+        {
+            int res = 0;
+            int sockfd = 0;
+            struct sockaddr_in local_addr;
+            sockfd = socket(AF_INET, SOCK_DGRAM, 0);
+            IF_EXIT(sockfd < 0, "socket");
+
+            memset(&local_addr, 0, sizeof(local_addr));
+            local_addr.sin_family = AF_INET;
+            local_addr.sin_addr.s_addr = htonl(INADDR_ANY);
+            local_addr.sin_port = htons(10010);
+
+            //绑定
+            res = ::bind(sockfd, (struct sockaddr*)&local_addr, sizeof(local_addr));
+            IF_EXIT(res < 0, "bind");
+
+            //设置本地回环许可
+            int loop = 1;
+            res = setsockopt(sockfd, IPPROTO_IP, IP_MULTICAST_LOOP, &loop, sizeof(loop));
+            IF_EXIT(res < 0, "setsockopt");
+
+            //加入多播组
+            struct ip_mreq mreq;
+            mreq.imr_multiaddr.s_addr = inet_addr("224.0.0.100"); /*多播组IP地址*/
+            mreq.imr_interface.s_addr = htonl(INADDR_ANY); /*加入的客服端主机IP地址*/
+
+            //本机加入多播组
+            res = setsockopt(sockfd,
+                IPPROTO_IP,
+                IP_ADD_MEMBERSHIP,
+                &mreq,
+                sizeof(mreq));
+            IF_EXIT(res < 0, "setsockopt");
+
+            char buffer[1024];
+            socklen_t srvaddr_len = sizeof(local_addr);
+            while(1)
+            {
+                memset(buffer, 0, 1024);
+                res = recvfrom(sockfd,
+                    buffer,
+                    1024,
+                    0,
+                    (struct sockaddr*)(&local_addr),
+                    &srvaddr_len);
+
+                std::cout << "recvfrom : " << buffer << endl;
+            }
+
+            //退出多播组
+            res = setsockopt(sockfd,
+                IPPROTO_IP,
+                IP_DROP_MEMBERSHIP,
+                &mreq,
+                sizeof(mreq));
+            IF_EXIT(res < 0, "setsockopt");
+        }
+
+        void CClientMng::recv_broadcast()
+        {
+            int res = 0;
+            int sockfd = 0;
+            struct sockaddr_in local_addr;
+            sockfd = socket(AF_INET, SOCK_DGRAM, 0);
+            IF_EXIT(sockfd < 0, "socket");
+
+            memset(&local_addr, 0, sizeof(local_addr));
+            local_addr.sin_family = AF_INET;
+            local_addr.sin_addr.s_addr = inet_addr("192.168.2.255");
+            local_addr.sin_port = htons(10000);
+
+            res = ::bind(sockfd, (struct sockaddr*)&local_addr, sizeof(local_addr));
+            IF_EXIT(res < 0, "bind");
+
+            char buffer[1024];
+            socklen_t srvaddr_len = sizeof(local_addr);
+            while(1)
+            {
+                memset(buffer, 0, 1024);
+                res = recvfrom(sockfd,
+                    buffer,
+                    1024,
+                    0,
+                    (struct sockaddr*)(&local_addr),
+                    &srvaddr_len);
+
+                std::cout << "recvfrom : " << buffer << endl;
+            }
+        }
+
+        void CClientMng::game_start()
+        {
+            
+        }
     #else
         #error "Unknown Apple platform"
     #endif
@@ -535,7 +631,7 @@ int CClientMng::init_thread()
 
 int main()
 {
-	string IP;
+	/*string IP;
 	int port = 0;
 	std::cout<< "请输入ip: ";
 	cin>>IP;
@@ -547,7 +643,11 @@ int main()
 
     clientMng.init(IP, port);
 
-    clientMng.start();
+    clientMng.start();*/
+
+    CClientMng clientMng;
+
+    clientMng.recv_broadcast();
 
 	return 0;
 }
