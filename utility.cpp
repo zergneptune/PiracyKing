@@ -5,6 +5,7 @@
 #include <fcntl.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <sys/time.h>
 
 using std::cin;
 using std::cout;
@@ -43,6 +44,71 @@ void CSemaphore::NoticeAll()
 {
     std::unique_lock<std::mutex> lck(m_mtx);
     m_cv.notify_all();
+}
+
+CSnowFlake::CSnowFlake()
+{
+    m_nMachineId = 0;
+    m_nMaxSerialNum = (1 << 12) - 1;
+    uint64_t curr_ms_ts = get_ms_ts();
+    m_nKey = 0;
+    m_nKey |= curr_ms_ts << 22;
+    m_nKey |= m_nMachineId << 12;
+    m_nLast_ms_ts = curr_ms_ts;
+}
+
+CSnowFlake::CSnowFlake(uint64_t machineid)
+{
+    //机器id大小范围（0~1023）
+    m_nMachineId = machineid;
+    m_nMaxSerialNum = (1 << 12) - 1;
+    uint64_t curr_ms_ts = get_ms_ts();
+    m_nKey = 0;
+    m_nKey |= curr_ms_ts << 22;
+    m_nKey |= m_nMachineId << 12;
+    m_nLast_ms_ts = curr_ms_ts;
+}
+
+CSnowFlake::~CSnowFlake(){}
+
+uint64_t CSnowFlake::get_sid()
+{
+    std::lock_guard<std::mutex> lck(m_mtx);
+    uint64_t curr_ms_ts = get_ms_ts();
+    if( curr_ms_ts > m_nLast_ms_ts )
+    {
+        m_nKey = 0;
+        m_nKey |= curr_ms_ts << 22;
+        m_nKey |= m_nMachineId << 12;
+        m_nLast_ms_ts = curr_ms_ts;
+        return m_nKey;
+    }
+    else
+    {
+        uint64_t nCurrSerialNum = m_nKey & m_nMaxSerialNum;
+        //1毫秒内并发数超过序列号上限
+        if( (nCurrSerialNum + 1) > m_nMaxSerialNum )
+        {
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+            lck.~lock_guard();
+            return get_sid();
+        }
+        else
+        {
+            //更新当前序列号
+            m_nKey &= (~(m_nMaxSerialNum));
+            m_nKey |= nCurrSerialNum + 1;
+            return m_nKey;
+        }
+    }
+}
+
+uint64_t CSnowFlake::get_ms_ts()
+{
+    struct timeval tv;
+    gettimeofday(&tv, NULL);
+    uint64_t ms_ts = tv.tv_sec + tv.tv_usec / 1000;
+    return ms_ts;
 }
 
 void setnonblocking(int sock)
@@ -129,6 +195,12 @@ int writen(int fd, const void *vptr, int n)
     }
  
     return n;
+}
+
+void enter_any_key_to_continue()
+{
+    char c;
+    while((c = getchar()) != '\n');
 }
 
 int get_input_number()

@@ -1,48 +1,8 @@
 #pragma once
 #include "utility.hpp"
+class CGameClient; 
 
 int connect_server(char* server_ip, int server_port);
-
-class CSocketRecv
-{
-public:
-	CSocketRecv(int* pkq, int* pfd, TASK_QUE* ptask);
-	~CSocketRecv();
-
-	void operator()();
-
-private:
-    int* 			m_pKq;
-    int*			m_pServerSockfd;
-    TASK_QUE*    	m_pQueTaskData;
-};
-
-class CSocketSend
-{
-public:
-	CSocketSend(TASK_QUE* p, int* pKq);
-	~CSocketSend();
-
-	void operator()();
-
-private:
-    TASK_QUE* 	m_pQueSendMsg;
-    int* 		m_pKq;
-};
-
-class CTaskProc
-{
-public:
-    CTaskProc(TASK_QUE* p1, TASK_QUE* p2, EVENT_NOTICE* p3);
-    ~CTaskProc();
-
-    void operator()();
-
-private:
-    TASK_QUE* 		m_pQueSendMsg;
-    TASK_QUE* 		m_pQueTaskData;
-    EVENT_NOTICE*	m_pEventNotice;
-};
 
 class CClientMng
 {
@@ -59,6 +19,14 @@ public:
 
 	int logout();
 
+	int join_room(uint64_t gid, int cid);
+
+	int create_room(uint64_t& gid, std::string& strRoomName);
+
+	int query_room_list(std::string& res);
+
+	int query_room_players(uint64_t gid, std::string& res);
+
 	int init(std::string ip, int port);
 
 	void recv_muticast();
@@ -73,17 +41,28 @@ private:
 
     int init_thread();
 
+	void socket_recv_thread_func();
+
+	void socket_send_thread_func();
+
+	void task_proc_thread_func();
+
 private:
-	CSocketRecv 	m_socketRecv;
 
-	CSocketSend		m_socketSend;
+	int login_menu();
 
-	CTaskProc		m_taskProc;
+	int main_menu();
+
+	int room_list_menu(uint64_t& nRoomId, std::string& strRoomName);
+
+	int player_list_menu(uint64_t nRoomId, std::string& strRoomName);
 
 private:
 	int             m_nKq;
 
     int             m_nServerSockfd;
+
+    int 			m_nClientID;
     
 	SOCKETFD_QUE 	m_queSocketFD;
 
@@ -93,5 +72,7 @@ private:
 
 	EVENT_NOTICE  	m_cEventNotice;
 
+	CSnowFlake		m_cSnowFlake;
 
+	CGameClient*	m_pGameClient;
 };

@@ -1,6 +1,7 @@
 #pragma once
 #include <iostream>
 #include <string>
+#include <vector>
 #include <map>
 #include <queue>
 #include <memory>
@@ -8,29 +9,38 @@
 #include <condition_variable>
 #include <future>
 #include <chrono>
+#include <algorithm>
+
+struct TTaskData;
+struct TSocketFD;
+struct TEventResult;
+template<typename T> class CTaskQueue;
+template<typename T> class CEventNotice;
+
+typedef CTaskQueue<TSocketFD> 					SOCKETFD_QUE;
+typedef CTaskQueue<std::shared_ptr<TTaskData>> 	TASK_QUE;
+typedef CEventNotice<std::string>				EVENT_NOTICE;
 
 enum MsgType
 {
-	REGIST = 0,
-	REGIST_RSP = 1,
-	LOGIN = 2,
-	LOGIN_RSP = 3,
-	LOGOUT = 4,
-	HEARTBEAT = 5,
-	CHAT = 6
+	REGIST,
+	REGIST_RSP,
+	LOGIN,
+	LOGIN_RSP,
+	LOGOUT,
+	HEARTBEAT,
+	CHAT,
+	QUERY_ROOM,
+	QUERY_ROOM_RSP,
+	QUERY_ROOM_PLAYERS,
+	QUERY_ROOM_PLAYERS_RSP,
+	CREATE_ROOM,
+	CREATE_ROOM_RSP,
+	JOIN_ROOM,
+	JOIN_ROOM_RSP,
 };
 
 #define IF_EXIT(predict, err) if(predict){ perror(err); exit(1); }
-
-struct TEventResult
-{
-	TEventResult(){}
-	TEventResult(std::string id, std::string result):
-		strTaskID(id), strResult(result){}
-
-	std::string strTaskID;
-	std::string strResult;
-};
 
 class CSemaphore
 {
@@ -58,25 +68,26 @@ public:
 	~CEventNotice(){}
 
 public:
-	int WaitNoticeFor(std::string& strTaskID, T& result, int timeout);
+	int WaitNoticeFor(uint64_t taskid, T& result, int timeout);
 
-	void Notice(std::string& strTaskID, T& result);
+	void Notice(uint64_t taskid, T& result);
 private:
-	std::map<std::string, std::promise<T>> 	m_mapEventResult;
+	std::map<uint64_t, std::promise<T>> 	m_mapEventResult;
 	std::mutex 								m_mtx;
 };
 
 template<typename T>
-int CEventNotice<T>::WaitNoticeFor(std::string& strTaskID, T& result, int timeout)
+int CEventNotice<T>::WaitNoticeFor(uint64_t taskid, T& result, int timeout)
 {
 	std::future<T> f;
 	{
 		std::unique_lock<std::mutex> lck(m_mtx);
-		auto iter = m_mapEventResult.find(strTaskID);
+		auto iter = m_mapEventResult.find(taskid);
 		if(iter == m_mapEventResult.end())
 		{
-			m_mapEventResult.insert(std::make_pair(strTaskID, std::promise<T>()));
-			f = m_mapEventResult[strTaskID].get_future();
+			auto res_pair = m_mapEventResult.insert(
+				std::make_pair(taskid, std::promise<T>()));
+			f = res_pair.first->second.get_future();
 		}
 	}
 
@@ -85,12 +96,11 @@ int CEventNotice<T>::WaitNoticeFor(std::string& strTaskID, T& result, int timeou
 		auto status = f.wait_for(std::chrono::milliseconds(timeout));
 		if(status == std::future_status::timeout)
 		{
-			std::cout << "等待事件超时!" << std::endl;
-			m_mapEventResult.erase(m_mapEventResult.find(strTaskID));
+			m_mapEventResult.erase(m_mapEventResult.find(taskid));
 			return -1;
 		}
 		
-		m_mapEventResult.erase(m_mapEventResult.find(strTaskID));
+		m_mapEventResult.erase(m_mapEventResult.find(taskid));
 		result = f.get();
 		return 0;
 	}
@@ -101,13 +111,13 @@ int CEventNotice<T>::WaitNoticeFor(std::string& strTaskID, T& result, int timeou
 }
 
 template<typename T>
-void CEventNotice<T>::Notice(std::string& strTaskID, T& result)
+void CEventNotice<T>::Notice(uint64_t taskid, T& result)
 {
 	std::unique_lock<std::mutex> lck(m_mtx);
-	auto iter = m_mapEventResult.find(strTaskID);
+	auto iter = m_mapEventResult.find(taskid);
 	if(iter != m_mapEventResult.end())
 	{
-		std::promise<T>& ref_p = m_mapEventResult[strTaskID];
+		std::promise<T>& ref_p = m_mapEventResult[taskid];
 		ref_p.set_value(result);
 	}
 }
@@ -174,11 +184,11 @@ bool CTaskQueue<T>::Empty()
 struct TTaskData
 {
 	TTaskData(){}
-	TTaskData(std::string id, int fd, MsgType type, std::string msg):
-		strTaskID(id), nSockfd(fd), msgType(type), strMsg(msg){}
+	TTaskData(uint64_t id, int fd, MsgType type, std::string msg):
+		nTaskId(id), nSockfd(fd), msgType(type), strMsg(msg){}
 
-	std::string 	strTaskID;	//任务id，唯一标示本次任务
-	int 			nSockfd;	//发送目标sockfd
+	uint64_t		nTaskId;	//任务id，唯一表示本次任务
+	int 			nSockfd;	//sockfd
 	MsgType 		msgType;	//消息类型
 	std::string 	strMsg;		//消息内容
 };
@@ -189,6 +199,7 @@ struct TMsgHead
 	TMsgHead(MsgType type, size_t len):
 		msgType(type), szMsgLength(len){}
 
+	uint64_t		nMsgId;			//消息id
 	MsgType 		msgType; 		//消息类型
 	size_t 			szMsgLength; 	//消息长度
 };
@@ -202,6 +213,34 @@ struct TSocketFD
 	int sockfd;
 };
 
+class CSnowFlake
+{
+	/*
+	*	bit: 	63 		62~22		21~12	11~0
+	*	desc:	默认为0	毫秒时间戳	机器号	序列号
+	*/
+public:
+	CSnowFlake();
+	CSnowFlake(uint64_t machineid);
+	~CSnowFlake();
+
+	uint64_t get_sid();
+
+private:
+
+	uint64_t 	get_ms_ts();
+
+	uint64_t 	m_nMachineId;
+
+	uint64_t    m_nMaxSerialNum;
+
+	uint64_t	m_nLast_ms_ts;
+
+	uint64_t	m_nKey;
+
+	std::mutex	m_mtx;
+};
+
 void setnonblocking(int sock);
 
 void setreuseaddr(int sock);
@@ -209,6 +248,8 @@ void setreuseaddr(int sock);
 int readn(int fd, void *vptr, int n);
 
 int writen(int fd, const void *vptr, int n);
+
+void enter_any_key_to_continue();
 
 int get_input_number();
 

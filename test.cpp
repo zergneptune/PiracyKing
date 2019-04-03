@@ -2,15 +2,15 @@
 #include <fstream>
 #include <sstream>
 #include <cstdint>
-#include <thread>
-#include <chrono>
+#include <vector>
 #include <list>
-#include<stdio.h>
-#include<termios.h>
-#include<fcntl.h>
- #include <sys/types.h>
- #include <sys/uio.h>
- #include <unistd.h>
+#include <algorithm>
+#include <stdio.h>
+#include <termios.h>
+#include <fcntl.h>
+#include <sys/types.h>
+#include <sys/uio.h>
+#include <unistd.h>
 #include "practice.hpp"
 #include "utility.hpp"
 /*-----------------------*/
@@ -629,6 +629,17 @@ private:
     CTaskQueue<CommandType> m_queCmd;
 };
 
+void thread_func(CSnowFlake* p)
+{
+    std::thread::id id = std::this_thread::get_id();
+    uint64_t sid = 0;
+    for(int i = 0; i < 10; ++ i)
+    {
+        sid = p->get_sid();
+        std::cout << " thread " << id << " get: " << sid << '\n';
+    }
+}
+
 int main(int argc, char const *argv[])
 {
 	/*
@@ -647,8 +658,18 @@ int main(int argc, char const *argv[])
 	cout << "A, C: " << std::is_same<A,C>::value << std::endl;
 	cout << "signed char, std::int8_t: " << std::is_same<signed char,std::int8_t>::value << std::endl;
 	*/
-    CGame game;
+    /*CGame game;
     game.init();
-    game.start();
+    game.start();*/
+    CSnowFlake  snowflake(0);
+    std::vector<std::thread> v;
+    for(int i = 0; i < 4; ++ i)
+    {
+        v.push_back(std::thread(thread_func, &snowflake));
+    }
+
+    std::for_each(v.begin(), v.end(), [](std::thread& th){
+        th.join();
+    });
     return 0;
 }

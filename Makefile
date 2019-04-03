@@ -1,17 +1,18 @@
-all : test server client
 .PHONY : all
+all : test server client
+
 OBJ1 = test.o practice.o
 OBJ2 = server.o
 OBJ3 = client.o
 OBJ4 = game.o
 OBJ5 = utility.o
 
-test : $(OBJ1)
-	g++ $(OBJ1) -o test
-server : $(OBJ2) $(OBJ5)
-	g++ $(OBJ2) $(OBJ5) -o server
+test : $(OBJ1) $(OBJ5)
+	g++ $(OBJ1) $(OBJ5) -o test
+server : $(OBJ2) $(OBJ4) $(OBJ5)
+	g++ $(OBJ2) $(OBJ4) $(OBJ5) -ljsoncpp -o server
 client : $(OBJ3) $(OBJ4) $(OBJ5)
-	g++ $(OBJ3) $(OBJ4) $(OBJ5) -o client
+	g++ $(OBJ3) $(OBJ4) $(OBJ5) -ljsoncpp -o client
 
 $(OBJ1): %.o: %.cpp
 	g++ -c $< -o $@ -std=c++11

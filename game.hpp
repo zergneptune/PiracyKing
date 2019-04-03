@@ -1,5 +1,6 @@
 #pragma once
 #include "utility.hpp"
+#include <list>
 
 // 隐藏光标
 #define HIDE_CURSOR() printf("\033[?25l")
@@ -22,9 +23,38 @@
 enum MapType
 {
     BLANK = 0,
-    BORDER = 1,
-    SNAKE = 2,
-    FOOD = 3
+    BORDER,
+    SNAKE,
+    FOOD
+};
+
+enum GameOptType
+{
+    MOVE_FORWARD = 0,
+    MOVE_UP,
+    MOVE_DOWN,
+    MOVE_LEFT,
+    MOVE_RIGHT
+};
+
+struct TGameFrame
+{
+    size_t      szFrameID;
+
+    int         optType[2];
+};
+
+struct TGameCmd
+{
+    TGameCmd(){}
+    TGameCmd(size_t gid, int cid, int type):
+        szGameID(gid), nClientID(cid), optType(type){}
+
+    size_t      szGameID;
+
+    int         nClientID;
+
+    int         optType;
 };
 
 class CMap
@@ -35,7 +65,7 @@ public:
 
     void init();
 
-    void refresh(std::string snake_color);
+    void refresh();
 
     int* operator[](int i)
     {
@@ -57,46 +87,16 @@ public:
         return m_overlap[x][y];
     }
 
+    void random_make_food();
+
 private:
+    std::string     m_strMapColor;
+
+    std::string     m_strFoodColor;
+
     int             m_map[MAP_H][MAP_W];
 
-    std::string     m_strColor;
-
     int             m_overlap[MAP_H][MAP_W];
-};
-
-class CFood
-{
-public:
-    CFood(CMap& map): m_map(map), m_strColor(GREEN);
-    ~CFood();
-
-    void random_make();
-
-    void make(int x, int y)
-    {
-        m_cox = x;
-        m_coy = y;
-    }
-
-    void set_color(std::string color)
-    {
-        m_strColor = color;
-    }
-
-    std::string get_color()
-    {
-        return m_strColor;
-    }
-
-private:
-    int             m_cox;
-
-    int             m_coy;
-
-    CMap&           m_map;
-
-    std::string     m_strColor;
 };
 
 class CSnakeNode
@@ -114,7 +114,8 @@ public:
 class CSnake
 {
 public:
-    CSnake(CMap& map, CFood& food);
+    CSnake();
+    CSnake(CMap* pmap, std::string color = RED);
     ~CSnake();
 
 public:
@@ -141,106 +142,140 @@ public:
         return m_strColor;
     }
 
-private:
-    void move_core(int r_x, int r_y) //参数为相对移动距离
+    void add_node(CSnakeNode node)
+    {
+        m_snake.push_back(node);
+    }
 
 private:
-    std::list<CSnakeNode> m_snake;
+    void move_core(int r_x, int r_y); //参数为相对移动距离
 
-    CMap&           m_map;
+private:
+    std::list<CSnakeNode>   m_snake;
 
-    CFood&          m_food;
-
-    std::mutex      m_mt;
+    CMap*           m_pMap;
 
     std::string     m_strColor;
+
+    std::mutex      m_mt;
 };
-
-enum class GameOpt
-{
-    MOVE_FORWARD = 0,
-    MOVE_UP = 1,
-    MOVE_DOWN = 2,
-    MOVE_LEFT = 3,
-    MOVE_RIGHT = 4
-}
-
-struct TGameFrame
-{
-    size_t      szFrameID:
-    GameOpt     opt[2];
-}
 
 class CGame
 {
-    typedef int G_Client; //客户端socketfd
-    typedef std::map<G_Client, CTaskQueue<GameOpt>> G_GameOptMap;
+    typedef int G_Client;
+    typedef std::map<G_Client, std::shared_ptr<CTaskQueue<int>>> G_GameOptMap;
 
 public:
-    CGame();
+    CGame(std::string strName);
     ~CGame();
 
     void start(int port);
 
     void over();
 
-    void add_client(G_Client client);
+    bool add_client(G_Client client);
 
-    void add_gameopt(G_Client client, GameOpt opt);
+    void remove_client(G_Client client);
+
+    void add_gameopt(G_Client client, GameOptType type);
+
+    int get_client_nums();
+
+    void get_client_ids(std::vector<int>& vecCids);
+
+    std::string get_name(){ return m_strRoomName; }
 
 private:
     void send_frame_thread_func(int port);
 
 private:
+
+    std::string     m_strRoomName;
+
     G_GameOptMap    m_mapGameOpt;
 
     std::mutex      m_mtx;
 
-    bool            m_bExit;
-}
+    bool            m_bExitSendFrame;
+};
 
 class CGameServer
 {
-    typedef size_t  G_GameID;
-    typedef std::map<G_GameID, CGame> G_GameMap;
+    typedef uint64_t G_GameID;
+    typedef std::map<G_GameID, std::shared_ptr<CGame>> G_GameMap;
 
 public:
     CGameServer();
     ~CGameServer();
 
-    bool add_game(G_GameID id, CGame& game);
+    uint64_t create_game(std::string& strGameName);
 
-    bool get_game(G_GameID id, CGame& game);
+    void remove_game(G_GameID gid);
+
+    void remove_player(int cid);
+
+    std::shared_ptr<CGame> get_game(G_GameID gid);
+
+    std::string get_gameid_list();
+
+    void get_cid_list(G_GameID id, std::vector<int>& vecCids);
+
 private:
+
+    bool is_game_name_existed(std::string& strGameName);
+
     G_GameMap   m_mapGame;
 
+    CSnowFlake  m_cSnowFlake;
+
     std::mutex  m_mtx;
-}
+};
 
 class CGameClient
 {
+    typedef int G_GameID;
+    typedef int G_ClientID;
+    typedef CTaskQueue<std::shared_ptr<TGameFrame>> GameFrameQue;
+    typedef CTaskQueue<std::shared_ptr<TGameCmd>>   GameCmdQue;
 public:
     CGameClient();
     ~CGameClient();
 
-    void init();
+    void start(int port);
 
-    void start();
+    void set_random_seed(int seed)
+    {
+        m_nRandSeed = seed;
+    }
+
+    void random_make_snake();
 
 private:
+    void init();
+
     void recv_frame_thread_func(int port);
 
     void refresh_thread_func();
 
 private:
-    CMap        m_map;
+    CMap            m_map;
 
-    CFood       m_food;
+    std::map<G_ClientID, CSnake>    m_mapSnake;
 
-    CSnake      m_snake[2];
+    GameCmdQue      m_queGameCmd;
 
-    TASK_QUE&   m_queSendMsg;
-}
+    GameFrameQue    m_queGameFrame;
+
+    bool            m_bExitRecvFrame;
+
+    bool            m_bExitRefresh;
+
+    G_GameID        m_gameID;
+
+    G_ClientID      m_clientID;
+
+    int             m_nRandSeed;
+};
 
 
 

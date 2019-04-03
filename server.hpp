@@ -1,60 +1,72 @@
 #pragma once
 #include "utility.hpp"
-typedef CTaskQueue<TSocketFD> 				SOCKETFD_QUE;
-typedef CTaskQueue<std::shared_ptr<TTaskData>> TASK_QUE;
+#include <functional>
+class CGameServer;
 
 int create_server(int port);
 
-class CListenThrFunc
+struct TClientInfo
 {
-public:
-	CListenThrFunc(SOCKETFD_QUE* pQueSockFD);
-	~CListenThrFunc();
+	TClientInfo(int id, std::string& account, std::string& passwd, std::string& name):
+		nClientID(id), strAccount(account), strPasswd(passwd), strName(name){}
 
-	void operator()(int port);
+	int 			nClientID;
 
-private:
-	SOCKETFD_QUE*	m_pQueSockFD;
+	std::string 	strAccount;
+
+	std::string 	strPasswd;
+
+	std::string 	strName;
 };
 
-class CSocketRecv
+class CClientInfoMng
 {
+	typedef	std::map<int, std::shared_ptr<TClientInfo>, std::less<int>> ClientInfoMap;
 public:
-	CSocketRecv(SOCKETFD_QUE* pQueSockFD, TASK_QUE* pTaskData);
-	~CSocketRecv();
+	CClientInfoMng();
+	~CClientInfoMng();
 
-	void operator()();
+public:
+	bool add_client(int cid, TClientInfo clientinfo);
+
+	int get_max_client_id();
+
+	bool is_client_existed(std::string& account);
+
+	std::shared_ptr<TClientInfo> find_client(std::string& account);
+
+	std::string get_name(int cid);
 
 private:
-    SOCKETFD_QUE*	m_pQueSockFD;
+	ClientInfoMap	m_mapClientInfo;
 
-    TASK_QUE* 		m_pQueTaskData;
+	std::mutex		m_mtx;
 };
 
-class CSocketSend
+class COnlinePlayers
 {
-public:
-	CSocketSend(TASK_QUE* p);
-	~CSocketSend();
+	typedef	int ClientID;
+	typedef int SocketFd;
+	typedef std::map<SocketFd, ClientID>	OnlinePlayersMap;
 
-	void operator()();
+public:
+	COnlinePlayers();
+	~COnlinePlayers();
+
+public:
+
+	void add_player(SocketFd fd, ClientID cid);
+
+	int remove_player_by_socketfd(SocketFd fd);
+
+	void remove_player_by_clientid(ClientID id);
+
+	bool is_player_online(ClientID cid);
 
 private:
-    TASK_QUE* 	m_pQueSendMsg;
-};
+	OnlinePlayersMap		m_mapOlinePlayers;
 
-class CTaskProc
-{
-public:
-    CTaskProc(TASK_QUE* pQueSend, TASK_QUE* pQueTask);
-    ~CTaskProc();
-
-    void operator()();
-
-private:
-    TASK_QUE* 	m_pQueSendMsg;
-
-    TASK_QUE* 	m_pQueTaskData;
+	std::mutex				m_mtx;
 };
 
 class CServerMng
@@ -72,17 +84,26 @@ public:
 
 	void send_broadcast();
 
+	void do_regiser(std::shared_ptr<TTaskData>& pTask);
+
+	void do_login(std::shared_ptr<TTaskData>& pTask);
+
+	void do_create_room(std::shared_ptr<TTaskData>& pTask);
+
+	void do_join_room(std::shared_ptr<TTaskData>& pTask);
+
+	void do_query_room_players(std::shared_ptr<TTaskData>& pTask);
+
 private:
 	void init_thread();
 
-private:
-	CSocketRecv 	m_socketRecv;
+	void socket_recv_thread_func();
 
-	CSocketSend		m_socketSend;
+	void socket_send_thread_func();
 
-	CTaskProc		m_taskProc;
+	void task_proc_thread_func();
 
-	CListenThrFunc 	m_listenThrFunc;
+	void listen_thread_func(int port);
 
 private:
 	int 			m_nPort;
@@ -92,4 +113,10 @@ private:
 	TASK_QUE		m_queSendMsg;
 
 	TASK_QUE 		m_queTaskData;
+
+	CGameServer*	m_pGameServer;
+
+	CClientInfoMng	m_ClientInfoMng;
+
+	COnlinePlayers	m_COnlinePlayers;
 };

@@ -5,7 +5,8 @@
 #include <stdio.h>
 #include <errno.h>
 #include <thread>
-#include <future>
+#include <json/json.h>
+#include "game.hpp"
 
 using namespace std;
 
@@ -155,21 +156,16 @@ using namespace std;
             return 0;
         }
 
-        CSocketSend::CSocketSend(TASK_QUE* p, int* pKq): m_pQueSendMsg(p), m_pKq(pKq){}
-
-        CSocketSend::~CSocketSend(){}
-
-        void CSocketSend::operator()()
+        void CClientMng::socket_send_thread_func()
         {
-            int sockfd = 0;
             int nRet = 0;
             int nSendBufferSize = 0;
             char* pSendBuffer = NULL;
             TMsgHead msgHead;
             while(1)
             {
-                shared_ptr<TTaskData> pTask = m_pQueSendMsg->Wait_GetTask();
-                sockfd = pTask->nSockfd;
+                shared_ptr<TTaskData> pTask = m_queSendMsg.Wait_GetTask();
+                msgHead.nMsgId = pTask->nTaskId;
                 msgHead.msgType = pTask->msgType;
                 msgHead.szMsgLength = pTask->strMsg.size();
                 nSendBufferSize = sizeof(TMsgHead) + msgHead.szMsgLength;
@@ -191,12 +187,7 @@ using namespace std;
             }
         }
 
-        CSocketRecv::CSocketRecv(int* pkq, int* pfd, TASK_QUE* ptask): 
-        m_pKq(pkq), m_pServerSockfd(pfd), m_pQueTaskData(ptask){}
-
-        CSocketRecv::~CSocketRecv(){}
-
-        void CSocketRecv::operator()()
+        void CClientMng::socket_recv_thread_func()
         {
             int n_ready = 0;
             int n_ret = 0;
@@ -208,11 +199,11 @@ using namespace std;
                 }};
 
             //注册读事件
-            RegisterEvent(*m_pKq, *m_pServerSockfd, EVFILT_READ, EV_ADD | EV_ENABLE);
+            RegisterEvent(m_nKq, m_nServerSockfd, EVFILT_READ, EV_ADD | EV_ENABLE);
             while(1)
             {
                 //等待事件
-                n_ready = kevent(*m_pKq, NULL, 0, events, LISTEN_MAX_NUM, NULL);
+                n_ready = kevent(m_nKq, NULL, 0, events, LISTEN_MAX_NUM, NULL);
                 IF_EXIT(n_ready < 0, "kevent");
                 for(int i = 0; i < n_ready; ++i)
                 {
@@ -241,6 +232,7 @@ using namespace std;
                         }
 
                         TMsgHead*   pMsgHead = reinterpret_cast<TMsgHead*>(pBuffer.get());
+                        uint64_t    nTaskId  = pMsgHead->nMsgId;
                         size_t      szMsgLen = pMsgHead->szMsgLength;
                         MsgType     msgtype  = pMsgHead->msgType;
                         pBuffer.reset(new char[szMsgLen + 1], deleter);
@@ -255,8 +247,8 @@ using namespace std;
 
                         //json解码msg，放入任务队列
                         cout << "接收到服务器消息: " << pBuffer << endl;
-                        m_pQueTaskData->AddTask(std::make_shared<TTaskData>(
-                                                        string("123"),
+                        m_queTaskData.AddTask(std::make_shared<TTaskData>(
+                                                        nTaskId,
                                                         sockfd,
                                                         msgtype,
                                                         string(pBuffer.get())));
@@ -266,45 +258,6 @@ using namespace std;
                         cerr << "event exception." << endl;
                         close(sockfd);
                     }
-                }
-            }
-        }
-
-        CTaskProc::CTaskProc(TASK_QUE* p1, TASK_QUE* p2, EVENT_NOTICE* p3):
-            m_pQueSendMsg(p1), m_pQueTaskData(p2), m_pEventNotice(p3){}
-        CTaskProc::~CTaskProc(){}
-        void CTaskProc::operator()()
-        {
-            while(1)
-            {
-                shared_ptr<TTaskData> pTask = m_pQueTaskData->Wait_GetTask();
-                TEventResult result;
-                switch(pTask->msgType)
-                {
-                    case HEARTBEAT:
-                        cout << "处理心跳任务." << endl;
-                        break;
-                    case REGIST_RSP:
-                        cout << "处理注册结果." << endl;
-                        result.strTaskID = pTask->strTaskID;
-                        result.strResult = pTask->strMsg;
-                        m_pEventNotice->Notice(
-                            pTask->strTaskID,
-                            result);
-                        break;
-                    case LOGIN_RSP:
-                        cout << "处理登录结果." << endl;
-                        result.strTaskID = pTask->strTaskID;
-                        result.strResult = pTask->strMsg;
-                        m_pEventNotice->Notice(
-                            pTask->strTaskID,
-                            result);
-                        break;
-                    case CHAT:
-                        cout << "处理聊天任务." << endl;
-                        break;
-                    default:
-                        break;
                 }
             }
         }
@@ -487,15 +440,82 @@ using namespace std;
     #error "Unknown compiler"
 #endif
 
-CClientMng::CClientMng(): 
-    m_socketRecv(&m_nKq, &m_nServerSockfd, &m_queTaskData),
-    m_socketSend(&m_queSendMsg, &m_nKq),
-    m_taskProc(&m_queSendMsg, &m_queTaskData, &m_cEventNotice){}
+CClientMng::CClientMng()
+{
+    m_pGameClient = new CGameClient();
+}
 
 CClientMng::~CClientMng(){}
 
+void CClientMng::task_proc_thread_func()
+{
+    while(1)
+    {
+        shared_ptr<TTaskData> pTask = m_queTaskData.Wait_GetTask();
+        switch(pTask->msgType)
+        {
+            case HEARTBEAT:
+                cout << "处理心跳任务." << endl;
+                break;
+            case REGIST_RSP:
+                cout << "处理注册结果." << endl;
+                m_cEventNotice.Notice(
+                    pTask->nTaskId,
+                    pTask->strMsg);
+                break;
+            case LOGIN_RSP:
+                cout << "处理登录结果." << endl;
+                m_cEventNotice.Notice(
+                    pTask->nTaskId,
+                    pTask->strMsg);
+                break;
+            case CHAT:
+                cout << "处理聊天结果." << endl;
+                break;
+            case QUERY_ROOM_RSP:
+                cout << "处理查询房间列表结果." << endl;
+                m_cEventNotice.Notice(
+                    pTask->nTaskId,
+                    pTask->strMsg);
+                break;
+            case QUERY_ROOM_PLAYERS_RSP:
+                cout << "处理查询玩家列表结果." << endl;
+                m_cEventNotice.Notice(
+                    pTask->nTaskId,
+                    pTask->strMsg);
+                break;
+            case CREATE_ROOM_RSP:
+                cout << "处理创建房间结果." << endl;
+                m_cEventNotice.Notice(
+                    pTask->nTaskId,
+                    pTask->strMsg);
+                break;
+            case JOIN_ROOM_RSP:
+                cout << "处理加入房间结果." << endl;
+                m_cEventNotice.Notice(
+                    pTask->nTaskId,
+                    pTask->strMsg);
+                break;
+            default:
+                break;
+        }
+    }
+}
+
 void CClientMng::start()
 {
+    int nRet = 0;
+    while(1)
+    {
+        login_menu();
+        main_menu();
+    }
+}
+
+int CClientMng::login_menu()
+{
+    int nInput = 0;
+    int nRet = 0;
     while(1)
     {
         printf("**********************\r\n");
@@ -503,9 +523,7 @@ void CClientMng::start()
         printf("\t2. 注册\n");
         printf("**********************\r\n");
         printf("\t输入: ");
-
-        int nInput = get_input_number();
-        int nRet = 0;
+        nInput = get_input_number();
 
         switch(nInput)
         {
@@ -514,9 +532,9 @@ void CClientMng::start()
                 if(nRet == 0)
                 {
                     cout << "登录成功！" << endl;
+                    return 0;
                 }
                 break;
-
             case 2:
                 nRet = regist();
                 if(nRet == 0)
@@ -524,6 +542,140 @@ void CClientMng::start()
                     cout << "注册成功！" << endl;
                 }
                 break;
+            default:
+                break;
+        }
+    }
+}
+
+int CClientMng::main_menu()
+{
+    int nInput = 0;
+    int nRet = 0;
+    uint64_t nRoomId = 0;
+    std::string strRoomName;
+    while(1)
+    {
+        printf("**********************\r\n");
+        printf("\t1. 加入房间\n");
+        printf("\t2. 创建房间\n");
+        printf("**********************\r\n");
+        printf("\t输入(0: 登出): ");
+        nInput = get_input_number();
+        switch(nInput)
+        {
+            case 0:
+                return 0;
+            case 1:
+                nRet = room_list_menu(nRoomId, strRoomName);
+                if(nRet == 0)
+                {
+                    nRet = join_room(nRoomId, m_nClientID);
+                    if(nRet == 0)
+                    {
+                        cout << "加入房间成功！" << endl;
+                        player_list_menu(nRoomId, strRoomName);
+                    }
+                }
+                break;
+            case 2:
+                nRet = create_room(nRoomId, strRoomName);
+                if(nRet == 0)
+                {
+                    cout << "创建房间: " << strRoomName << " 成功！" << endl;
+                    player_list_menu(nRoomId, strRoomName);
+                }
+                break;
+        }
+    }
+}
+
+int CClientMng::room_list_menu(uint64_t& nRoomId, std::string& strRoomName)
+{
+    Json::Value root;
+    Json::Reader reader;
+    std::string strRoomList;
+    int nInput = 0;
+    int nRet = 0;
+    int nCnt = 0;
+    while(1)
+    {
+        nRet = query_room_list(strRoomList);
+        reader.parse(strRoomList, root);
+        nCnt = 0;
+        printf("***********  房间列表  ***********\r\n");
+        if(root.isArray())
+        {
+            for(Json::Value::iterator iter = root.begin();
+                iter != root.end();
+                ++ iter)
+            {
+                printf("\t%d. 房间: %s 玩家数: %d\r\n", ++ nCnt,
+                                                    (*iter)["gname"].asString().c_str(),
+                                                    (*iter)["players"].asInt());
+            }
+            printf("*********************************\r\n");
+        }
+        else
+        {
+            printf("\tempty list\n");
+            printf("*********************************\r\n");
+            enter_any_key_to_continue();
+            return -1;
+        }
+
+        printf("\t加入房间(0: 返回): ");
+        nInput = get_input_number();
+        if(nInput >= 1 && nInput <= nCnt)
+        {
+            nRoomId = root[nInput - 1]["gid"].asUInt64();
+            strRoomName = root[nInput - 1]["gname"].asString();
+            return 0;
+        }
+        else if(nInput == 0)
+        {
+            return -1;
+        }
+    }
+}
+
+int CClientMng::player_list_menu(uint64_t nRoomId, std::string& strRoomName)
+{
+    Json::Value root;
+    Json::Reader reader;
+    std::string strPlayerList;
+    int nInput = 0;
+    int nCnt = 0;
+    while(1)
+    {
+        query_room_players(nRoomId, strPlayerList);
+        root.clear();
+        reader.parse(strPlayerList, root);
+        printf("***********  房间: %s  ***********\r\n", strRoomName.c_str());
+        nCnt = 0;
+        if(root.isArray())
+        {
+            for(Json::Value::iterator iter = root.begin();
+                iter != root.end();
+                ++ iter)
+            {
+                printf("\t玩家%d: %s\r\n", ++ nCnt, (*iter)["name"].asString().c_str());
+            }
+            printf("*********************************\r\n");
+        }
+        else
+        {
+            printf("\tempty list\n");
+            printf("*********************************\r\n");
+            enter_any_key_to_continue();
+            return -1;
+        }
+
+        printf("\t输入(0: 退出房间): ");
+        nInput = get_input_number();
+        if(nInput == 0)
+        {
+            return -1;
         }
     }
 }
@@ -532,6 +684,8 @@ int CClientMng::regist()
 {
     printf("输入账号: ");
     string strAccount = get_input_string();
+    printf("输入姓名: ");
+    string strName = get_input_string();
     string strPasswd, strPasswdConfirm;
     while(1)
     {
@@ -550,20 +704,41 @@ int CClientMng::regist()
         }
     }
 
-    string strTaskID("123");
+    uint64_t nSid = m_cSnowFlake.get_sid();
+    Json::Value root;
+    Json::FastWriter fwriter;
+    root["account"] = strAccount;
+    root["passwd"] = strPasswd;
+    root["name"] = strName;
     m_queSendMsg.AddTask(make_shared<TTaskData>(
-                                strTaskID,
+                                nSid,
                                 m_nServerSockfd,
                                 REGIST,
-                                strAccount + string(",") + strPasswd));
-    TEventResult result;
-    int nRet = m_cEventNotice.WaitNoticeFor(strTaskID, result, 10);
+                                fwriter.write(root)));
+    std::string result;
+    int nRet = m_cEventNotice.WaitNoticeFor(nSid, result, 10);
     if(nRet < 0)
     {
-        cout << "注册失败！" << endl;
+        cout << "注册超时！" << endl;
         return -1;
     }
-    return 0;
+
+    Json::Reader reader;
+    root.clear();
+    if(reader.parse(result, root))
+    {
+        nRet = root["res"].asInt();
+        if(nRet < 0)
+        {
+            cout << "注册失败！" << endl;
+        }
+
+        m_nClientID = root["cid"].asInt();
+
+        return nRet;
+    }
+
+    return -1;
 }
 
 int CClientMng::login()
@@ -573,26 +748,165 @@ int CClientMng::login()
     printf("输入密码: ");
     string strPasswd = get_input_string();
 
-    string strTaskID("123");
+    uint64_t nSid = m_cSnowFlake.get_sid();
+    Json::Value root;
+    Json::FastWriter fwriter;
+    root["account"] = strAccount;
+    root["passwd"] = strPasswd;
     m_queSendMsg.AddTask(make_shared<TTaskData>(
-                                    strTaskID,
+                                    nSid,
                                     m_nServerSockfd,
                                     LOGIN,
-                                    strAccount + string(",") + strPasswd));
-    TEventResult result;
-    int nRet = m_cEventNotice.WaitNoticeFor(strTaskID, result, 10);
+                                    fwriter.write(root)));
+    std::string result;
+    int nRet = m_cEventNotice.WaitNoticeFor(nSid, result, 10);
     if(nRet < 0)
     {
         cout << "登录超时！" << endl;
         return -1;
     }
-    return 0;
+
+    Json::Reader reader;
+    root.clear();
+    if(reader.parse(result, root))
+    {
+        nRet = root["res"].asInt();
+        if(nRet < 0)
+        {
+            cout << "登录失败！" << endl;
+        }
+
+        m_nClientID = root["cid"].asInt();
+        return nRet;
+    }
+
+    return -1;
 }
 
 int CClientMng::logout()
 {
     exit(0);
     return 0;
+}
+
+int CClientMng::create_room(uint64_t& gid, std::string& strRoomName)
+{
+    printf("输入要创建的房间名: ");
+    strRoomName = get_input_string();
+    uint64_t nSid = m_cSnowFlake.get_sid();
+    Json::Value root;
+    Json::FastWriter fwriter;
+    root["cid"] = m_nClientID;
+    root["room_name"] = strRoomName;
+    m_queSendMsg.AddTask(make_shared<TTaskData>(
+                                    nSid,
+                                    m_nServerSockfd,
+                                    CREATE_ROOM,
+                                    fwriter.write(root)));
+    std::string result;
+    int nRet = m_cEventNotice.WaitNoticeFor(nSid, result, 10);
+    if(nRet < 0)
+    {
+        cout << "创建房间超时！" << endl;
+        return -1;
+    }
+
+    Json::Reader reader;
+    root.clear();
+    if(reader.parse(result, root))
+    {
+        nRet = root["res"].asInt();
+        if(nRet < 0)
+        {
+            cout << "创建房间失败：" << root["msg"].asString() << endl;
+        }
+
+        gid = root["gid"].asUInt64();
+        strRoomName = root["gname"].asString();
+
+        return nRet;
+    }
+
+    return -1;
+}
+
+int CClientMng::query_room_list(std::string& res)
+{
+    uint64_t nSid = m_cSnowFlake.get_sid();
+    m_queSendMsg.AddTask(make_shared<TTaskData>(
+                                    nSid,
+                                    m_nServerSockfd,
+                                    QUERY_ROOM,
+                                    string("")));
+    std::string result;
+    int nRet = m_cEventNotice.WaitNoticeFor(nSid, result, 10);
+    if(nRet < 0)
+    {
+        cout << "查询房间列表失败！" << endl;
+        return -1;
+    }
+
+    res = result;
+    return 0;
+}
+
+int CClientMng::query_room_players(uint64_t gid, std::string& res)
+{
+    uint64_t nSid = m_cSnowFlake.get_sid();
+    Json::Value root;
+    Json::FastWriter fwriter;
+    root["gid"] = gid;
+    m_queSendMsg.AddTask(make_shared<TTaskData>(
+                                    nSid,
+                                    m_nServerSockfd,
+                                    QUERY_ROOM_PLAYERS,
+                                    fwriter.write(root)));
+    std::string result;
+    int nRet = m_cEventNotice.WaitNoticeFor(nSid, result, 10);
+    if(nRet < 0)
+    {
+        cout << "查询玩家列表超时！" << endl;
+        return -1;
+    }
+
+    res = result;
+
+    return 0;
+}
+
+int CClientMng::join_room(uint64_t gid, int cid)
+{
+    uint64_t nSid = m_cSnowFlake.get_sid();
+    Json::Value root;
+    Json::FastWriter fwriter;
+    root["gid"] = gid;
+    root["cid"] = cid;
+    m_queSendMsg.AddTask(make_shared<TTaskData>(
+                                    nSid,
+                                    m_nServerSockfd,
+                                    JOIN_ROOM,
+                                    fwriter.write(root)));
+    std::string result;
+    int nRet = m_cEventNotice.WaitNoticeFor(nSid, result, 10);
+    if(nRet < 0)
+    {
+        cout << "加入房间超时！" << endl;
+        return -1;
+    }
+
+    Json::Reader reader;
+    root.clear();
+    if(reader.parse(result, root))
+    {
+        nRet = root["res"].asInt();
+        if(nRet < 0)
+        {
+            cout << "加入房间失败：" << root["msg"].asString() << endl;
+        }
+
+        return nRet;
+    }
+    return -1;
 }
 
 int CClientMng::init(string ip, int port)
@@ -619,9 +933,20 @@ int CClientMng::init(string ip, int port)
 
 int CClientMng::init_thread()
 {
-    thread socketRecvThread(m_socketRecv);
-    thread socketSendThread(m_socketSend);
-    thread taskProcThread(m_taskProc);
+    thread socketRecvThread([this]()
+        {
+            this->socket_recv_thread_func();
+        });
+
+    thread socketSendThread([this]()
+        {
+            this->socket_send_thread_func();
+        });
+
+    thread taskProcThread([this]()
+        {
+            this->task_proc_thread_func();
+        });
 
     socketRecvThread.detach();
     socketSendThread.detach();
@@ -631,23 +956,51 @@ int CClientMng::init_thread()
 
 int main()
 {
-	/*string IP;
-	int port = 0;
-	std::cout<< "请输入ip: ";
-	cin>>IP;
-	std::cout<< "请输入port: ";
-	cin>>port;
+	string IP("127.0.0.1");
+	int port = 10086;
+	//std::cout<< "请输入ip: ";
+	//cin>>IP;
+	//std::cout<< "请输入port: ";
+	//cin>>port;
 	//connect_server(IP.c_str(), port);
 
     CClientMng clientMng;
 
     clientMng.init(IP, port);
 
-    clientMng.start();*/
+    clientMng.start();
 
-    CClientMng clientMng;
+    /*
+    Json::Value root;
+    root["a"] = 1;
+    root["b"] = 2;
+    Json::FastWriter swriter;
+    std::string res1 = swriter.write(root);
+    std::cout << res1;
 
-    clientMng.recv_broadcast();
+    std::string str("{\"a\":1,\"b\":\"123\",\"c\":12.3}");
+
+    Json::Reader reader;
+    Json::Value value;
+    if(reader.parse(str, value))
+    {
+        std::cout << value["a"].asInt() << endl;
+    }
+
+    Json::Value arr_value;
+    arr_value.resize(2);
+    value["a"] = 1;
+    value["b"] = 2;
+    arr_value[0] = value;
+    arr_value[1] = value;
+    //arr_value.append(value);
+    //arr_value.append(value);
+
+    std::cout << arr_value.size() << endl;
+    res1 = swriter.write(arr_value);
+    std::cout << res1 << endl;
+    */
+
 
 	return 0;
 }
