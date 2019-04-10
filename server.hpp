@@ -7,7 +7,7 @@ int create_server(int port);
 
 struct TClientInfo
 {
-	TClientInfo(int id, std::string& account, std::string& passwd, std::string& name):
+	TClientInfo(int id, std::string account, std::string passwd, std::string name):
 		nClientID(id), strAccount(account), strPasswd(passwd), strName(name){}
 
 	int 			nClientID;
@@ -63,6 +63,8 @@ public:
 
 	bool is_player_online(ClientID cid);
 
+	int get_sockfd(ClientID cid);
+
 private:
 	OnlinePlayersMap		m_mapOlinePlayers;
 
@@ -88,11 +90,23 @@ public:
 
 	void do_login(std::shared_ptr<TTaskData>& pTask);
 
+	void do_logout(std::shared_ptr<TTaskData>& pTask);
+
 	void do_create_room(std::shared_ptr<TTaskData>& pTask);
 
 	void do_join_room(std::shared_ptr<TTaskData>& pTask);
 
+	void do_quit_room(std::shared_ptr<TTaskData>& pTask);
+
+	void do_game_ready(std::shared_ptr<TTaskData>& pTask);
+
+	void do_quit_game_ready(std::shared_ptr<TTaskData>& pTask);
+
+	void do_game_start(std::shared_ptr<TTaskData>& pTask);
+
 	void do_query_room_players(std::shared_ptr<TTaskData>& pTask);
+
+	void do_request_game_start(std::shared_ptr<TTaskData>& pTask);
 
 private:
 	void init_thread();

@@ -235,7 +235,7 @@ using namespace std;
 
                     if(event.flags & EV_ERROR || event.flags & EV_EOF)
                     {
-                        cerr << "event error, close it." << endl;
+                        //cerr << "event error, close it." << endl;
                         struct sockaddr_in clientaddr;
                         socklen_t addrlen;
                         getpeername(sockfd, (struct sockaddr*)&clientaddr, &addrlen);
@@ -274,7 +274,7 @@ using namespace std;
                         }
 
                         //json解码msg，放入任务队列
-                        cout << "接收到客户端的信息: " << msgtype << endl;
+                        cout << "接收到客户端命令: " << msgtype << endl;
                         m_queTaskData.AddTask(std::make_shared<TTaskData>(
                                                     nMsgId,
                                                     sockfd,
@@ -704,6 +704,22 @@ bool COnlinePlayers::is_player_online(ClientID cid)
     return false;
 }
 
+int COnlinePlayers::get_sockfd(ClientID cid)
+{
+    std::lock_guard<std::mutex> lck(m_mtx);
+    for(auto iter = m_mapOlinePlayers.begin();
+        iter != m_mapOlinePlayers.end();
+        ++ iter)
+    {
+        if(iter->second == cid)
+        {
+            return iter->first;
+        }
+    }
+
+    return -1;
+}
+
 CServerMng::CServerMng()
 {
     m_pGameServer = new CGameServer();
@@ -713,6 +729,31 @@ CServerMng::~CServerMng(){}
 
 void CServerMng::start(int port)
 {
+    /*
+    ** 添加测试账号
+    ** acounts: 123, passwd: 123, name: luffy
+    ** acounts: 456, passwd: 456, name: zoro
+    ** acounts: 789, passwd: 789, name: sanji
+    */
+    m_ClientInfoMng.add_client(1,
+                    TClientInfo(
+                        1,
+                        string("123"),
+                        string("123"),
+                        string("luffy")));
+    m_ClientInfoMng.add_client(2,
+                    TClientInfo(
+                        2,
+                        string("456"),
+                        string("456"),
+                        string("zoro")));
+    m_ClientInfoMng.add_client(3,
+                    TClientInfo(
+                        3,
+                        string("789"),
+                        string("789"),
+                        string("sanji")));
+    /**************************************************/
     std::thread listenThread([this, port]()
         {
             this->listen_thread_func(port);
@@ -774,6 +815,7 @@ void CServerMng::task_proc_thread_func()
                 break;
             case MsgType::LOGOUT:
                 cout << "处理客户端登出请求." << endl;
+                do_logout(pTask);
                 break;
             case MsgType::CHAT:
                 cout << "处理客户端聊天请求." << endl;
@@ -797,6 +839,26 @@ void CServerMng::task_proc_thread_func()
             case MsgType::JOIN_ROOM:
                 cout << "处理客户端加入房间请求." << endl;
                 do_join_room(pTask);
+                break;
+            case MsgType::QUIT_ROOM:
+                cout << "处理客户端退出房间请求." << endl;
+                do_quit_room(pTask);
+                break;
+            case MsgType::GAME_READY:
+                cout << "处理客户端游戏准备请求." << endl;
+                do_game_ready(pTask);
+                break;
+            case MsgType::QUIT_GAME_READY:
+                cout << "处理客户端退出游戏准备请求." << endl;
+                do_quit_game_ready(pTask);
+                break;
+            case MsgType::REQ_GAME_START:
+                cout << "处理客户端请求开始游戏." << endl;
+                do_request_game_start(pTask);
+                break;
+            case MsgType::GAME_START:
+                cout << "处理客户端开始游戏." << endl;
+                do_game_start(pTask);
                 break;
             default:
                 break;
@@ -901,6 +963,26 @@ void CServerMng::do_login(std::shared_ptr<TTaskData>& pTask)
                     fwriter.write(root)));
 }
 
+void CServerMng::do_logout(std::shared_ptr<TTaskData>& pTask)
+{
+    Json::Value root;
+    Json::FastWriter fwriter;
+    Json::Reader reader;
+    if(reader.parse(pTask->strMsg, root))
+    {
+        int nCid = root["cid"].asInt();
+        root.clear();
+        m_COnlinePlayers.remove_player_by_clientid(nCid);
+        root["res"] = 0;
+    }
+
+    m_queSendMsg.AddTask(make_shared<TTaskData>(
+                    pTask->nTaskId,
+                    pTask->nSockfd,
+                    MsgType::LOGOUT_RSP,
+                    fwriter.write(root)));
+}
+
 void CServerMng::do_create_room(std::shared_ptr<TTaskData>& pTask)
 {
     Json::Value root;
@@ -911,16 +993,8 @@ void CServerMng::do_create_room(std::shared_ptr<TTaskData>& pTask)
         int cid = root["cid"].asInt();
         std::string strRoomName = root["room_name"].asString();
         root.clear();
-        uint64_t gid = m_pGameServer->create_game(strRoomName);
-        auto pGame = m_pGameServer->get_game(gid);
-        if(pGame)
-        {
-            pGame->add_client(cid);
-            root["res"] = 0;
-            root["gid"] = gid;
-            root["gname"] = strRoomName;
-        }
-        else
+        uint64_t gid = m_pGameServer->create_game(cid, strRoomName);
+        if(gid < 0)
         {
             root["res"] = -1;
             if(gid == -1)
@@ -931,6 +1005,13 @@ void CServerMng::do_create_room(std::shared_ptr<TTaskData>& pTask)
             {
                 root["msg"] = string("未知错误.");
             }
+        }
+        else
+        {
+            root["res"] = 0;
+            root["gid"] = gid;
+            root["gname"] = strRoomName;
+            root["room_owner"] = cid;
         }
     }
     else
@@ -957,21 +1038,26 @@ void CServerMng::do_query_room_players(std::shared_ptr<TTaskData>& pTask)
     if(reader.parse(pTask->strMsg, root))
     {
         uint64_t gid = root["gid"].asUInt64();
-        root.clear();
+        int room_owner = m_pGameServer->get_room_owner(gid);
         m_pGameServer->get_cid_list(gid, vecCids);
+        Json::Value value;
         for(auto iter = vecCids.begin(); iter != vecCids.end(); ++ iter)
         {
-            root["cid"] = *iter;
-            root["name"] = m_ClientInfoMng.get_name(*iter);
-            player_list.append(root);
+            value["cid"] = *iter;
+            value["name"] = m_ClientInfoMng.get_name(*iter);
+            player_list.append(value);
         }
+
+        root.clear();
+        root["room_owner"] = room_owner;
+        root["client_info"] = player_list;
     }
 
     m_queSendMsg.AddTask(make_shared<TTaskData>(
                     pTask->nTaskId,
                     pTask->nSockfd,
                     MsgType::QUERY_ROOM_PLAYERS_RSP,
-                    fwriter.write(player_list)));
+                    fwriter.write(root)));
 }
 
 void CServerMng::do_join_room(std::shared_ptr<TTaskData>& pTask)
@@ -984,24 +1070,86 @@ void CServerMng::do_join_room(std::shared_ptr<TTaskData>& pTask)
         uint64_t gid = root["gid"].asUInt64();
         int cid = root["cid"].asInt();
         root.clear();
-        auto pGame = m_pGameServer->get_game(gid);
-        if(pGame)
+        int nRes = m_pGameServer->add_game_player(gid, cid);
+        if(nRes < 0)
         {
-            bool bRet = pGame->add_client(cid);
-            if(bRet)
-            {
-                root["res"] = 0;
-            }
-            else
+            if(nRes == -1)
             {
                 root["res"] = -1;
                 root["msg"] = string("超出房间人数限制(2人).");
             }
+            else if(nRes == -2)
+            {
+                root["res"] = -2;
+                root["msg"] = string("游戏房间不存在.");
+            }
+            
         }
         else
         {
+            root["res"] = 0;
+        }
+    }
+    else
+    {
+        root.clear();
+        root["res"] = -3;
+        root["msg"] = string("json解码失败.");
+    }
+
+    m_queSendMsg.AddTask(make_shared<TTaskData>(
+                    pTask->nTaskId,
+                    pTask->nSockfd,
+                    MsgType::JOIN_ROOM_RSP,
+                    fwriter.write(root)));
+}
+
+void CServerMng::do_quit_room(std::shared_ptr<TTaskData>& pTask)
+{
+    Json::Value root;
+    Json::FastWriter fwriter;
+    Json::Reader reader;
+    if(reader.parse(pTask->strMsg, root))
+    {
+        uint64_t gid = root["gid"].asUInt64();
+        int cid = root["cid"].asInt();
+        root.clear();
+        m_pGameServer->remove_player(gid, cid);
+        root["res"] = 0;
+    }
+    else
+    {
+        root.clear();
+        root["res"] = -2;
+        root["msg"] = string("json解码失败.");
+    }
+
+    m_queSendMsg.AddTask(make_shared<TTaskData>(
+                    pTask->nTaskId,
+                    pTask->nSockfd,
+                    MsgType::QUIT_ROOM_RSP,
+                    fwriter.write(root)));
+}
+
+void CServerMng::do_game_ready(std::shared_ptr<TTaskData>& pTask)
+{
+    Json::Value root;
+    Json::FastWriter fwriter;
+    Json::Reader reader;
+    if(reader.parse(pTask->strMsg, root))
+    {
+        uint64_t gid = root["gid"].asUInt64();
+        int cid = root["cid"].asInt();
+        root.clear();
+        int nRes = m_pGameServer->game_ready(gid, cid);
+        if(nRes < 0)
+        {
             root["res"] = -1;
-            root["msg"] = string("游戏房间不存在.");
+            root["msg"] = string("未知错误.");
+        }
+        else
+        {
+            root["res"] = 0;
         }
     }
     else
@@ -1014,7 +1162,117 @@ void CServerMng::do_join_room(std::shared_ptr<TTaskData>& pTask)
     m_queSendMsg.AddTask(make_shared<TTaskData>(
                     pTask->nTaskId,
                     pTask->nSockfd,
-                    MsgType::JOIN_ROOM_RSP,
+                    MsgType::GAME_READY_RSP,
+                    fwriter.write(root)));
+}
+
+void CServerMng::do_quit_game_ready(std::shared_ptr<TTaskData>& pTask)
+{
+    Json::Value root;
+    Json::FastWriter fwriter;
+    Json::Reader reader;
+    if(reader.parse(pTask->strMsg, root))
+    {
+        uint64_t gid = root["gid"].asUInt64();
+        int cid = root["cid"].asInt();
+        root.clear();
+        int nRes = m_pGameServer->quit_game_ready(gid, cid);
+        if(nRes < 0)
+        {
+            root["res"] = -1;
+            root["msg"] = string("未知错误.");
+        }
+        else
+        {
+            root["res"] = 0;
+        }
+    }
+    else
+    {
+        root.clear();
+        root["res"] = -2;
+        root["msg"] = string("json解码失败.");
+    }
+
+    m_queSendMsg.AddTask(make_shared<TTaskData>(
+                    pTask->nTaskId,
+                    pTask->nSockfd,
+                    MsgType::QUIT_GAME_READY_RSP,
+                    fwriter.write(root)));
+}
+
+void CServerMng::do_game_start(std::shared_ptr<TTaskData>& pTask)
+{
+    Json::Value root;
+    Json::FastWriter fwriter;
+    Json::Reader reader;
+    std::vector<int> vecCids;
+    if(reader.parse(pTask->strMsg, root))
+    {
+        uint64_t gid = root["gid"].asUInt64();
+        m_pGameServer->get_cid_list(gid, vecCids);
+        root.clear();
+        root["res"] = 0;
+    }
+    else
+    {
+        root.clear();
+        root["res"] = -2;
+        root["msg"] = string("json解码失败.");
+    }
+
+    //通知该游戏房间下的所有玩家开始游戏
+    for(auto& cid : vecCids)
+    {
+        int sockfd = m_COnlinePlayers.get_sockfd(cid);
+        if(sockfd > 0)
+        {
+            m_queSendMsg.AddTask(make_shared<TTaskData>(
+                    0,
+                    sockfd,
+                    MsgType::GAME_START,
+                    fwriter.write(root)));
+        }
+    }
+}
+
+void CServerMng::do_request_game_start(std::shared_ptr<TTaskData>& pTask)
+{
+    Json::Value root;
+    Json::FastWriter fwriter;
+    Json::Reader reader;
+    if(reader.parse(pTask->strMsg, root))
+    {
+        uint64_t gid = root["gid"].asUInt64();
+        root.clear();
+        int nPlayerNums = m_pGameServer->get_player_nums(gid);
+        bool bIsGameReady = m_pGameServer->get_game_ready_status(gid);
+        if(nPlayerNums < 2)
+        {
+            root["res"] = -1;
+            root["msg"] = string("房间人数未满.");
+        }
+        else if(!bIsGameReady)
+        {
+            root["res"] = -1;
+            root["msg"] = string("请等待所有玩家准备.");
+        }
+        else
+        {
+            root["res"] = 0;
+        }
+    }
+    else
+    {
+        root.clear();
+        root["res"] = -2;
+        root["msg"] = string("json解码失败.");
+    }
+
+    m_queSendMsg.AddTask(make_shared<TTaskData>(
+                    pTask->nTaskId,
+                    pTask->nSockfd,
+                    MsgType::REQ_GAME_START,
                     fwriter.write(root)));
 }
 

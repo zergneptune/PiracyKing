@@ -28,6 +28,7 @@ enum MsgType
 	LOGIN,
 	LOGIN_RSP,
 	LOGOUT,
+	LOGOUT_RSP,
 	HEARTBEAT,
 	CHAT,
 	QUERY_ROOM,
@@ -38,6 +39,14 @@ enum MsgType
 	CREATE_ROOM_RSP,
 	JOIN_ROOM,
 	JOIN_ROOM_RSP,
+	QUIT_ROOM,
+	QUIT_ROOM_RSP,
+	GAME_READY,
+	GAME_READY_RSP,
+	QUIT_GAME_READY,
+	QUIT_GAME_READY_RSP,
+	REQ_GAME_START,
+	GAME_START
 };
 
 #define IF_EXIT(predict, err) if(predict){ perror(err); exit(1); }

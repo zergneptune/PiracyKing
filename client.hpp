@@ -19,21 +19,33 @@ public:
 
 	int logout();
 
-	int join_room(uint64_t gid, int cid);
+	int join_room(uint64_t gid);
 
 	int create_room(uint64_t& gid, std::string& strRoomName);
+
+	int quit_room(uint64_t gid);
 
 	int query_room_list(std::string& res);
 
 	int query_room_players(uint64_t gid, std::string& res);
+
+	int game_ready(uint64_t gid);
+
+	int quit_game_ready(uint64_t gid);
+
+	int wait_to_start();
+
+	void set_start();
+
+	int request_start_game(uint64_t gid);
+
+	void game_start(uint64_t gid);
 
 	int init(std::string ip, int port);
 
 	void recv_muticast();
 
 	void recv_broadcast();
-
-	void game_start();
 
 private:
 	
@@ -75,4 +87,10 @@ private:
 	CSnowFlake		m_cSnowFlake;
 
 	CGameClient*	m_pGameClient;
+
+	std::mutex		m_mtx;
+
+	std::condition_variable 	m_cv;
+
+	bool			m_bGameStart;
 };

@@ -199,8 +199,8 @@ int writen(int fd, const void *vptr, int n)
 
 void enter_any_key_to_continue()
 {
-    char c;
-    while((c = getchar()) != '\n');
+    cout << "输入任意键继续...";
+    get_input_string();
 }
 
 int get_input_number()

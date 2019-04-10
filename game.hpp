@@ -162,8 +162,10 @@ private:
 
 class CGame
 {
-    typedef int G_Client;
-    typedef std::map<G_Client, std::shared_ptr<CTaskQueue<int>>> G_GameOptMap;
+    typedef int G_ClientID; //客户端
+    typedef int G_RoomOwner;//房主
+    typedef std::map<G_ClientID, std::shared_ptr<CTaskQueue<int>>> G_GameOptMap;
+    typedef std::map<G_ClientID, int> G_GameReadyMap;
 
 public:
     CGame(std::string strName);
@@ -173,17 +175,31 @@ public:
 
     void over();
 
-    bool add_client(G_Client client);
+    bool add_client(G_ClientID client);
 
-    void remove_client(G_Client client);
+    bool remove_client(G_ClientID client);
 
-    void add_gameopt(G_Client client, GameOptType type);
+    bool ready(G_ClientID client);
+
+    bool quit_ready(G_ClientID client);
+
+    bool get_ready_status(G_ClientID client);
+
+    bool is_all_ready();
 
     int get_client_nums();
 
     void get_client_ids(std::vector<int>& vecCids);
 
     std::string get_name(){ return m_strRoomName; }
+
+    int set_room_owner();
+
+    int set_room_owner(G_ClientID cid);
+
+    int get_room_owner(){ return m_roomOwner; }
+
+    void add_gameopt(G_ClientID client, GameOptType type);
 
 private:
     void send_frame_thread_func(int port);
@@ -194,9 +210,13 @@ private:
 
     G_GameOptMap    m_mapGameOpt;
 
+    G_GameReadyMap  m_mapGameReady;
+
     std::mutex      m_mtx;
 
     bool            m_bExitSendFrame;
+
+    G_RoomOwner     m_roomOwner;
 };
 
 class CGameServer
@@ -208,17 +228,35 @@ public:
     CGameServer();
     ~CGameServer();
 
-    uint64_t create_game(std::string& strGameName);
+    uint64_t create_game(int cid, std::string& strGameName);
 
     void remove_game(G_GameID gid);
 
     void remove_player(int cid);
+
+    void remove_player(G_GameID gid, int cid);
+
+    int add_game_player(G_GameID gid, int cid);
+
+    int game_ready(G_GameID gid, int cid);
+
+    int quit_game_ready(G_GameID gid, int cid);
+
+    bool get_game_ready_status(G_GameID gid);
+
+    //bool game_start(G_GameID gid);
 
     std::shared_ptr<CGame> get_game(G_GameID gid);
 
     std::string get_gameid_list();
 
     void get_cid_list(G_GameID id, std::vector<int>& vecCids);
+
+    int get_room_owner(G_GameID id);
+
+    int get_player_nums(G_GameID id);
+
+    int player_game_ready(G_GameID id, int cid);
 
 private:
 
