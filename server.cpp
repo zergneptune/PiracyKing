@@ -1213,6 +1213,10 @@ void CServerMng::do_game_start(std::shared_ptr<TTaskData>& pTask)
         m_pGameServer->get_cid_list(gid, vecCids);
         root.clear();
         root["res"] = 0;
+        int nRandSeed = time(NULL);
+        root["rand_seed"] = nRandSeed;
+
+        m_pGameServer->game_start(gid);
     }
     else
     {

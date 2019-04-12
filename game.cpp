@@ -435,7 +435,7 @@ void CGame::send_frame_thread_func(int port)
     		temp_frame.optType[i++] = opttype;
     	}
 
-    	temp_frame.szFrameID = frame_cnt++;
+    	temp_frame.szFrameID = ++ frame_cnt;
 
         res = sendto(sockfd,
             &temp_frame,
@@ -444,9 +444,12 @@ void CGame::send_frame_thread_func(int port)
             (struct sockaddr*)(&mcast_addr),
             sizeof(mcast_addr));
 
-        std::cout << "res = " << res << std::endl;
+        std::cout << "res = " << res << ", errno = " << errno << std::endl;
         std::this_thread::sleep_for(std::chrono::milliseconds(50));
     }
+
+    //关闭套接字
+    close(sockfd);
 }
 
 CGameServer::CGameServer(): m_cSnowFlake(0){}
@@ -564,6 +567,26 @@ int CGameServer::quit_game_ready(G_GameID gid, int cid)
     return -1;
 }
 
+void CGameServer::game_start(G_GameID gid)
+{
+    std::lock_guard<std::mutex> lck(m_mtx);
+    auto iter = m_mapGame.find(gid);
+    if(iter != m_mapGame.end())
+    {
+        iter->second->start(10010);
+    }
+}
+
+void CGameServer::game_over(G_GameID gid)
+{
+    std::lock_guard<std::mutex> lck(m_mtx);
+    auto iter = m_mapGame.find(gid);
+    if(iter != m_mapGame.end())
+    {
+        iter->second->over();
+    }
+}
+
 bool CGameServer::get_game_ready_status(G_GameID gid)
 {
     std::lock_guard<std::mutex> lck(m_mtx);
@@ -671,11 +694,6 @@ int CGameServer::get_player_nums(G_GameID id)
     }
 
     return -1;
-}
-
-int CGameServer::player_game_ready(G_GameID id, int cid)
-{
-
 }
 
 CGameClient::CGameClient(){}
@@ -879,7 +897,7 @@ void CGameClient::recv_frame_thread_func(int port)
     res = setsockopt(sockfd, IPPROTO_IP, IP_MULTICAST_LOOP, &loop, sizeof(loop));
     IF_EXIT(res < 0, "setsockopt");
 
-    //加入多播组
+    //设置多播ip地址
     struct ip_mreq mreq;
     mreq.imr_multiaddr.s_addr = inet_addr("224.0.0.100"); /*多播组IP地址*/
     mreq.imr_interface.s_addr = htonl(INADDR_ANY); /*加入的客服端主机IP地址*/
@@ -895,9 +913,10 @@ void CGameClient::recv_frame_thread_func(int port)
     char buffer[sizeof(TGameFrame)];
     socklen_t srvaddr_len = sizeof(local_addr);
     TGameFrame* pframe = NULL;
-    int i = 0;
+    printf("debug\r\n");
     while(!m_bExitRecvFrame)
     {
+        printf("start recvfrom\r\n");
         res = recvfrom(sockfd,
             buffer,
             sizeof(TGameFrame),
@@ -906,6 +925,7 @@ void CGameClient::recv_frame_thread_func(int port)
             &srvaddr_len);
         IF_EXIT(res < 0, "recvfrom");
 
+        printf("recv res = %d\r\n", res);
         pframe = reinterpret_cast<TGameFrame*>(buffer);
         m_queGameFrame.AddTask(std::make_shared<TGameFrame>(*pframe));
     }
@@ -916,6 +936,9 @@ void CGameClient::recv_frame_thread_func(int port)
         IP_DROP_MEMBERSHIP,
         &mreq,
         sizeof(mreq));
+
+    //关闭套接字
+    close(sockfd);
     IF_EXIT(res < 0, "setsockopt");
 }
 

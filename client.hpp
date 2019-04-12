@@ -11,7 +11,7 @@ public:
 	~CClientMng();
 
 public:
-	void start();
+	void start_menu();
 
 	int regist();
 
@@ -35,7 +35,7 @@ public:
 
 	int wait_to_start();
 
-	void set_start();
+	void set_start(std::shared_ptr<TTaskData>& pTask);
 
 	int request_start_game(uint64_t gid);
 

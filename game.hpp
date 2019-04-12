@@ -242,9 +242,11 @@ public:
 
     int quit_game_ready(G_GameID gid, int cid);
 
-    bool get_game_ready_status(G_GameID gid);
+    void game_start(G_GameID gid);
 
-    //bool game_start(G_GameID gid);
+    void game_over(G_GameID gid);
+
+    bool get_game_ready_status(G_GameID gid);
 
     std::shared_ptr<CGame> get_game(G_GameID gid);
 
@@ -255,8 +257,6 @@ public:
     int get_room_owner(G_GameID id);
 
     int get_player_nums(G_GameID id);
-
-    int player_game_ready(G_GameID id, int cid);
 
 private:
 

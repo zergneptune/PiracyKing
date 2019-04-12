@@ -523,7 +523,7 @@ void CClientMng::task_proc_thread_func()
                 break;
             case MsgType::GAME_START:
                 cout << "开始游戏结果." << endl;
-                set_start();
+                set_start(pTask);
                 break;
             default:
                 break;
@@ -531,7 +531,7 @@ void CClientMng::task_proc_thread_func()
     }
 }
 
-void CClientMng::start()
+void CClientMng::start_menu()
 {
     int nRet = 0;
     while(1)
@@ -1233,18 +1233,24 @@ int CClientMng::wait_to_start()
     return -1;
 }
 
-void CClientMng::set_start()
+void CClientMng::set_start(std::shared_ptr<TTaskData>& pTask)
 {
+    Json::Value root;
+    Json::Reader reader;
+    if(reader.parse(pTask->strMsg, root))
     {
-        std::lock_guard<std::mutex>  lck(m_mtx);
-        m_bGameStart = true;
-    }
-
-    for(int i = 0; i < 5; ++ i)
-    {
-        printf("\x1b[H\x1b[2J");
-        printf("游戏即将开始: %ds\r\n", 5 - i);
-        std::this_thread::sleep_for(std::chrono::seconds(1));
+        m_pGameClient->set_random_seed(root["rand_seed"].asInt());
+        {
+            std::lock_guard<std::mutex>  lck(m_mtx);
+            m_bGameStart = true;
+        }
+        
+        for(int i = 0; i < 5; ++ i)
+        {
+            printf("\x1b[H\x1b[2J");
+            printf("游戏即将开始: %ds\r\n", 5 - i);
+            std::this_thread::sleep_for(std::chrono::seconds(1));
+        }
     }
 
     m_cv.notify_one();
@@ -1303,6 +1309,7 @@ void CClientMng::game_start(uint64_t gid)
     m_cv.wait(lck);
 
     cout << "进入游戏成功!" << endl;
+    m_pGameClient->start(10010);
 }
 
 int CClientMng::init(string ip, int port)
@@ -1364,7 +1371,7 @@ int main()
 
     clientMng.init(IP, port);
 
-    clientMng.start();
+    clientMng.start_menu();
 
 
 	return 0;
