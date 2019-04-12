@@ -1359,7 +1359,7 @@ int CClientMng::init_thread()
 
 int main()
 {
-	string IP("127.0.0.1");
+	string IP("192.168.1.188");
 	int port = 10086;
 	//std::cout<< "请输入ip: ";
 	//cin>>IP;
