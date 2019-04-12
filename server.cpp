@@ -133,11 +133,11 @@ using namespace std;
                         //enable读事件，准备从客户端读消息
                         RegisterEvent(kq, sockfd, EVFILT_READ, EV_ADD | EV_ENABLE);
                     }
-                    else if(event.filter == EVFILT_EXCEPT)
+                    /*else if(event.filter == EVFILT_EXCEPT)
                     {
                         cerr << "event exception, deleted from kqueue." << endl;
                         close(sockfd);
-                    }
+                    }*/
                 }
             }
         }
@@ -197,11 +197,11 @@ using namespace std;
                     //加入队列
                     m_queSockFD.AddTask(TSocketFD(connfd));
                 }
-                else if(event.filter == EVFILT_EXCEPT)
+                /*else if(event.filter == EVFILT_EXCEPT)
                 {
                     cerr << "event exception, close it." << endl;
                     close(sockfd);
-                }
+                }*/
             }
         }
 
@@ -281,12 +281,12 @@ using namespace std;
                                                     msgtype,
                                                     string(pBuffer.get())));
                     }
-                    else if(event.filter == EVFILT_EXCEPT)
+                    /*else if(event.filter == EVFILT_EXCEPT)
                     {
                         cerr << "event exception." << endl;
                         close(sockfd);
                         continue;
-                    }
+                    }*/
                 }
 
                 //处理连接套接字
