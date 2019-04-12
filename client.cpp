@@ -109,12 +109,12 @@ using namespace std;
                         line[n_read] = '\0';
                         cout << "recv from server: " << line << endl;
                     }
-                    else if(event.filter == EVFILT_EXCEPT)
+                    /*else if(event.filter == EVFILT_EXCEPT)
                     {
                         cerr << "event exception, deleted from kqueue." << endl;
                         RegisterEvent(kq, sockfd, EVFILT_READ, EV_DELETE);
                         //RegisterEvent(kq, sockfd, EVFILT_WRITE, EV_DELETE);
-                    }
+                    }*/
                 }
             }
         }
@@ -253,11 +253,11 @@ using namespace std;
                                                         msgtype,
                                                         string(pBuffer.get())));
                     }
-                    else if(event.filter == EVFILT_EXCEPT)
+                    /*else if(event.filter == EVFILT_EXCEPT)
                     {
                         cerr << "event exception." << endl;
                         close(sockfd);
-                    }
+                    }*/
                 }
             }
         }
