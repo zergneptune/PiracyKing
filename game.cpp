@@ -753,6 +753,7 @@ CGameClient::~CGameClient(){}
 
 void CGameClient::init()
 {
+    std::cout << "random seed = " << m_nRandSeed << std::endl;
 	m_map.init();
     srand(m_nRandSeed);//设置随机种子
     random_make_snake();
@@ -941,7 +942,7 @@ void CGameClient::recv_frame_thread_func(int port)
 
     //绑定
     res = ::bind(sockfd, (struct sockaddr*)&local_addr, sizeof(local_addr));
-    IF_EXIT(res < 0, "bind");
+    //IF_EXIT(res < 0, "bind");
 
     //设置本地回环许可
     int loop = 1;
