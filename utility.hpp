@@ -46,7 +46,8 @@ enum MsgType
 	QUIT_GAME_READY,
 	QUIT_GAME_READY_RSP,
 	REQ_GAME_START,
-	GAME_START
+	GAME_START,
+	QUIT_GAME
 };
 
 #define IF_EXIT(predict, err) if(predict){ perror(err); exit(1); }

@@ -104,6 +104,8 @@ public:
 
 	void do_game_start(std::shared_ptr<TTaskData>& pTask);
 
+	void do_quit_game(std::shared_ptr<TTaskData>& pTask);
+
 	void do_query_room_players(std::shared_ptr<TTaskData>& pTask);
 
 	void do_request_game_start(std::shared_ptr<TTaskData>& pTask);

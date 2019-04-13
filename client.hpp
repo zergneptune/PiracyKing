@@ -41,6 +41,8 @@ public:
 
 	void game_start(uint64_t gid);
 
+	void quit_game(uint64_t gid);
+
 	int init(std::string ip, int port);
 
 	void recv_muticast();

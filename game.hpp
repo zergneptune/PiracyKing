@@ -236,7 +236,7 @@ public:
 
     void remove_player(G_GameID gid, int cid);
 
-    int add_game_player(G_GameID gid, int cid);
+    int add_player(G_GameID gid, int cid);
 
     int game_ready(G_GameID gid, int cid);
 

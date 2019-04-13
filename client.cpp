@@ -525,6 +525,12 @@ void CClientMng::task_proc_thread_func()
                 cout << "开始游戏结果." << endl;
                 set_start(pTask);
                 break;
+            case MsgType::QUIT_GAME:
+                cout << "退出游戏结果." << endl;
+                m_cEventNotice.Notice(
+                    pTask->nTaskId,
+                    pTask->strMsg);
+                break;
             default:
                 break;
         }
@@ -1309,7 +1315,43 @@ void CClientMng::game_start(uint64_t gid)
     m_cv.wait(lck);
 
     cout << "进入游戏成功!" << endl;
+    //进入游戏主循环
     m_pGameClient->start(10010);
+    //退出游戏
+    quit_game(gid);
+}
+
+void CClientMng::quit_game(uint64_t gid)
+{
+    uint64_t nSid = m_cSnowFlake.get_sid();
+    Json::Value root;
+    Json::FastWriter fwriter;
+    root["gid"] = gid;
+    root["cid"] = m_nClientID;
+    m_queSendMsg.AddTask(make_shared<TTaskData>(
+                                    nSid,
+                                    m_nServerSockfd,
+                                    QUIT_GAME,
+                                    fwriter.write(root)));
+    std::string result;
+    int nRet = m_cEventNotice.WaitNoticeFor(nSid, result, 10);
+    if(nRet < 0)
+    {
+        cout << "退出游戏超时！" << endl;
+        enter_any_key_to_continue();
+    }
+
+    Json::Reader reader;
+    root.clear();
+    if(reader.parse(result, root))
+    {
+        nRet = root["res"].asInt();
+        if(nRet < 0)
+        {
+            cout << "退出游戏失败：" << root["msg"].asString() << endl;
+            enter_any_key_to_continue();
+        }
+    }
 }
 
 int CClientMng::init(string ip, int port)

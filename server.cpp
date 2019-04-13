@@ -860,6 +860,10 @@ void CServerMng::task_proc_thread_func()
                 cout << "处理客户端开始游戏." << endl;
                 do_game_start(pTask);
                 break;
+            case MsgType::QUIT_GAME:
+                cout << "处理客户端退出游戏." << endl;
+                do_quit_game(pTask);
+                break;
             default:
                 break;
         }
@@ -1070,7 +1074,7 @@ void CServerMng::do_join_room(std::shared_ptr<TTaskData>& pTask)
         uint64_t gid = root["gid"].asUInt64();
         int cid = root["cid"].asInt();
         root.clear();
-        int nRes = m_pGameServer->add_game_player(gid, cid);
+        int nRes = m_pGameServer->add_player(gid, cid);
         if(nRes < 0)
         {
             if(nRes == -1)
@@ -1238,6 +1242,33 @@ void CServerMng::do_game_start(std::shared_ptr<TTaskData>& pTask)
                     fwriter.write(root)));
         }
     }
+}
+
+void CServerMng::do_quit_game(std::shared_ptr<TTaskData>& pTask)
+{
+    Json::Value root;
+    Json::FastWriter fwriter;
+    Json::Reader reader;
+    if(reader.parse(pTask->strMsg, root))
+    {
+        uint64_t gid = root["gid"].asUInt64();
+        int cid = root["cid"].asInt();
+        root.clear();
+        m_pGameServer->remove_player(gid, cid);
+        root["res"] = 0;
+    }
+    else
+    {
+        root.clear();
+        root["res"] = -2;
+        root["msg"] = string("json解码失败.");
+    }
+
+    m_queSendMsg.AddTask(make_shared<TTaskData>(
+                    pTask->nTaskId,
+                    pTask->nSockfd,
+                    MsgType::QUIT_GAME,
+                    fwriter.write(root)));
 }
 
 void CServerMng::do_request_game_start(std::shared_ptr<TTaskData>& pTask)

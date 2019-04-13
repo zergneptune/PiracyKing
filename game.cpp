@@ -298,8 +298,17 @@ bool CGame::add_client(G_ClientID client)
 bool CGame::remove_client(G_ClientID client)
 {
     std::lock_guard<std::mutex> lock(m_mtx);
-    m_mapGameOpt.erase(m_mapGameOpt.find(client));
-    m_mapGameReady.erase(m_mapGameReady.find(client));
+    auto iter_1 = m_mapGameOpt.find(client);
+    if(iter_1 != m_mapGameOpt.end())
+    {
+        m_mapGameOpt.erase(iter_1);
+    }
+
+    auto iter_2 = m_mapGameReady.find(client);
+    if(iter_2 != m_mapGameReady.end())
+    {
+        m_mapGameReady.erase(iter_2);
+    }
 
     return true;
 }
@@ -500,7 +509,11 @@ uint64_t CGameServer::create_game(int cid, std::string& strGameName)
 void CGameServer::remove_game(G_GameID gid)
 {
     std::lock_guard<std::mutex> lck(m_mtx);
-    m_mapGame.erase(m_mapGame.find(gid));
+    auto iter = m_mapGame.find(gid);
+    if(iter != m_mapGame.end())
+    {
+        m_mapGame.erase(iter);
+    }
 }
 
 void CGameServer::remove_player(int cid)
@@ -512,6 +525,7 @@ void CGameServer::remove_player(int cid)
         {
             if(iter->second->get_client_nums() == 0)
             {
+                iter->second->over();
                 m_mapGame.erase(iter);
                 return;
             }
@@ -528,7 +542,32 @@ void CGameServer::remove_player(int cid)
     }
 }
 
-int CGameServer::add_game_player(G_GameID gid, int cid)
+void CGameServer::remove_player(G_GameID gid, int cid)
+{
+    std::lock_guard<std::mutex> lck(m_mtx);
+    auto iter = m_mapGame.find(gid);
+    if(iter != m_mapGame.end())
+    {
+        if(iter->second->remove_client(cid))
+        {
+            if(iter->second->get_client_nums() == 0)
+            {
+                iter->second->over();
+                m_mapGame.erase(iter);
+            }
+            else
+            {
+                //如果删除的玩家是房主，那么重新设置房主
+                if(iter->second->get_room_owner() == cid)
+                {
+                    iter->second->set_room_owner();
+                }
+            }
+        }
+    }
+}
+
+int CGameServer::add_player(G_GameID gid, int cid)
 {
     std::lock_guard<std::mutex> lck(m_mtx);
     auto iter = m_mapGame.find(gid);
@@ -600,30 +639,6 @@ bool CGameServer::get_game_ready_status(G_GameID gid)
     }
     
     return false;
-}
-
-void CGameServer::remove_player(G_GameID gid, int cid)
-{
-    std::lock_guard<std::mutex> lck(m_mtx);
-    auto iter = m_mapGame.find(gid);
-    if(iter != m_mapGame.end())
-    {
-        if(iter->second->remove_client(cid))
-        {
-            if(iter->second->get_client_nums() == 0)
-            {
-                m_mapGame.erase(iter);
-            }
-            else
-            {
-                //如果删除的玩家是房主，那么重新设置房主
-                if(iter->second->get_room_owner() == cid)
-                {
-                    iter->second->set_room_owner();
-                }
-            }
-        }
-    }
 }
 
 std::shared_ptr<CGame> CGameServer::get_game(G_GameID gid)
