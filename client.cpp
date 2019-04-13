@@ -777,11 +777,8 @@ int CClientMng::player_list_menu(uint64_t nRoomId, std::string& strRoomName)
             }
             else if(nInput == 1)
             {
-                nRes = game_ready(nRoomId);
-                if(nRes == 0)
-                {
-                    game_start(nRoomId);
-                }
+                game_ready(nRoomId);
+                game_start(nRoomId);
                 quit_game_ready(nRoomId);
             }
         }

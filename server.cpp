@@ -1254,7 +1254,11 @@ void CServerMng::do_quit_game(std::shared_ptr<TTaskData>& pTask)
         uint64_t gid = root["gid"].asUInt64();
         int cid = root["cid"].asInt();
         root.clear();
-        m_pGameServer->remove_player(gid, cid);
+        bool bRes = m_pGameServer->get_game_running_status(gid);
+        if(!bRes)
+        {
+            m_pGameServer->game_over(gid);
+        }
         root["res"] = 0;
     }
     else

@@ -345,6 +345,27 @@ bool CGame::get_ready_status(G_ClientID client)
     return m_mapGameReady[client];
 }
 
+bool CGame::get_running_status()
+{
+    std::lock_guard<std::mutex> lock(m_mtx);
+    int nPlayerNum = m_mapGameReady.size();
+    int nQuitReadyCnt = 0;
+    for(auto iter = m_mapGameReady.begin(); iter != m_mapGameReady.end(); ++ iter)
+    {
+        if(iter->second == 0)
+        {
+            ++ nQuitReadyCnt;
+        }
+    }
+
+    if(nQuitReadyCnt == nPlayerNum - 1)
+    {
+        return false;
+    }
+
+    return true;
+}
+
 bool CGame::is_all_ready()
 {
     std::lock_guard<std::mutex> lock(m_mtx);
@@ -633,6 +654,21 @@ bool CGameServer::get_game_ready_status(G_GameID gid)
     if(iter != m_mapGame.end())
     {
         if(iter->second->is_all_ready())
+        {
+            return true;
+        }
+    }
+    
+    return false;
+}
+
+bool CGameServer::get_game_running_status(G_GameID gid)
+{
+    std::lock_guard<std::mutex> lck(m_mtx);
+    auto iter = m_mapGame.find(gid);
+    if(iter != m_mapGame.end())
+    {
+        if(iter->second->get_running_status())
         {
             return true;
         }

@@ -185,6 +185,8 @@ public:
 
     bool get_ready_status(G_ClientID client);
 
+    bool get_running_status();
+
     bool is_all_ready();
 
     int get_client_nums();
@@ -247,6 +249,8 @@ public:
     void game_over(G_GameID gid);
 
     bool get_game_ready_status(G_GameID gid);
+
+    bool get_game_running_status(G_GameID gid);
 
     std::shared_ptr<CGame> get_game(G_GameID gid);
 
