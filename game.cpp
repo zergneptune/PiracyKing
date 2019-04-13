@@ -965,10 +965,8 @@ void CGameClient::recv_frame_thread_func(int port)
     char buffer[sizeof(TGameFrame)];
     socklen_t srvaddr_len = sizeof(local_addr);
     TGameFrame* pframe = NULL;
-    printf("debug\r\n");
     while(!m_bExitRecvFrame)
     {
-        printf("start recvfrom\r\n");
         res = recvfrom(sockfd,
             buffer,
             sizeof(TGameFrame),

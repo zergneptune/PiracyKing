@@ -779,7 +779,6 @@ int CClientMng::player_list_menu(uint64_t nRoomId, std::string& strRoomName)
             {
                 game_ready(nRoomId);
                 game_start(nRoomId);
-                quit_game_ready(nRoomId);
             }
         }
     }
@@ -1315,6 +1314,7 @@ void CClientMng::game_start(uint64_t gid)
     //进入游戏主循环
     m_pGameClient->start(10010);
     //退出游戏
+    quit_game_ready(gid);
     quit_game(gid);
 }
 
