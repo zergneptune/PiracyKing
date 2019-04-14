@@ -804,6 +804,7 @@ void CServerMng::task_proc_thread_func()
         {
             case MsgType::GAME_PLAYER_CMD:
                 cout << "处理客户端游戏操作." << endl;
+                do_game_cmd(pTask);
                 break;
             case MsgType::HEARTBEAT:
                 cout << "处理客户端心跳." << endl;

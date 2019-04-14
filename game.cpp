@@ -479,7 +479,7 @@ void CGame::send_frame_thread_func(int port)
             (struct sockaddr*)(&mcast_addr),
             sizeof(mcast_addr));
 
-        std::cout << "res = " << res << ", errno = " << errno << std::endl;
+        //std::cout << "res = " << res << ", errno = " << errno << std::endl;
         std::this_thread::sleep_for(std::chrono::milliseconds(50));
     }
 
