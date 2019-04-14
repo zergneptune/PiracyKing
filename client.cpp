@@ -1241,7 +1241,21 @@ void CClientMng::set_start(std::shared_ptr<TTaskData>& pTask)
     Json::Reader reader;
     if(reader.parse(pTask->strMsg, root))
     {
+        int nRandomSeed = root["rand_seed"].asInt();
+        Json::Value game_players = root["cids"];
+
+        //添加客户端对应的蛇对象
+        for(auto iter = game_players.begin();
+                iter != game_players.end();
+                ++ iter)
+        {
+            m_pGameClient->add_snake((*iter).asInt());
+        }
+
+        //设置随机种子
         m_pGameClient->set_random_seed(root["rand_seed"].asInt());
+
+        //游戏开始标志置位
         {
             std::lock_guard<std::mutex>  lck(m_mtx);
             m_bGameStart = true;
@@ -1255,6 +1269,7 @@ void CClientMng::set_start(std::shared_ptr<TTaskData>& pTask)
         }
     }
 
+    //通知等待游戏开始的客户端
     m_cv.notify_one();
 }
 
@@ -1309,13 +1324,17 @@ void CClientMng::game_start(uint64_t gid)
 {
     std::unique_lock<std::mutex> lck(m_mtx);
     m_cv.wait(lck);
-
     cout << "进入游戏成功!" << endl;
+
     //进入游戏主循环
-    m_pGameClient->start(10010);
+    m_pGameClient->play(10010);
+
     //退出游戏
     quit_game_ready(gid);
     quit_game(gid);
+
+    //移除客户端对应的蛇对象
+    m_pGameClient->clear_snake();
 }
 
 void CClientMng::quit_game(uint64_t gid)

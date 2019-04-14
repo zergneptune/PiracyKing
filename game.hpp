@@ -17,8 +17,8 @@
 #define DEEP_GREEN  "\033[36m"
 #define WHITE       "\033[37m"
 
-#define MAP_W 64
-#define MAP_H 32
+#define MAP_W 50
+#define MAP_H 28
 
 enum MapType
 {
@@ -146,6 +146,8 @@ public:
     {
         m_snake.push_back(node);
     }
+
+    void vanish();
 
 private:
     void move_core(int r_x, int r_y); //参数为相对移动距离
@@ -279,16 +281,20 @@ class CGameClient
     typedef int G_ClientID;
     typedef CTaskQueue<std::shared_ptr<TGameFrame>> GameFrameQue;
     typedef CTaskQueue<std::shared_ptr<TGameCmd>>   GameCmdQue;
+    typedef std::map<G_ClientID, std::shared_ptr<CSnake>>   SnakeMap;
 public:
     CGameClient();
     ~CGameClient();
 
-    void start(int port);
+    void play(int port);
 
-    void set_random_seed(int seed)
-    {
-        m_nRandSeed = seed;
-    }
+    void set_random_seed(int seed){ m_nRandSeed = seed; }
+
+    void add_snake(G_ClientID);
+
+    void remove_snake(G_ClientID); //移走蛇的同时，清空地图上的位置
+
+    void clear_snake();
 
     void random_make_snake();
 
@@ -302,7 +308,9 @@ private:
 private:
     CMap            m_map;
 
-    std::map<G_ClientID, CSnake>    m_mapSnake;
+    std::mutex      m_mtx_snake;
+
+    SnakeMap        m_mapSnake;
 
     GameCmdQue      m_queGameCmd;
 

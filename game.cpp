@@ -260,6 +260,11 @@ void CSnake::move_core(int r_x, int r_y) //参数为相对移动距离
     m_snake.splice(m_snake.begin(), m_snake, iter);
 }
 
+void CSnake::vanish()
+{
+
+}
+
 CGame::CGame(std::string strName): m_strRoomName(strName), m_roomOwner(-1){}
 
 CGame::~CGame(){}
@@ -760,7 +765,7 @@ void CGameClient::init()
     m_map.random_make_food();
 }
 
-void CGameClient::start(int port)
+void CGameClient::play(int port)
 {
     init();//初始化
     m_bExitRecvFrame = false;
@@ -870,15 +875,40 @@ void CGameClient::start(int port)
     std::this_thread::sleep_for(std::chrono::seconds(1));
 }
 
+void CGameClient::add_snake(G_ClientID cid)
+{
+    std::lock_guard<std::mutex> lck(m_mtx_snake);
+    m_mapSnake.insert(std::make_pair(cid,
+                                    std::make_shared<CSnake>(&m_map)));
+}
+
+void CGameClient::remove_snake(G_ClientID cid)
+{
+    std::lock_guard<std::mutex> lck(m_mtx_snake);
+    auto iter = m_mapSnake.find(cid);
+    if(iter != m_mapSnake.end())
+    {
+        iter->second->vanish();
+    }
+}
+
+void CGameClient::clear_snake()
+{
+    std::lock_guard<std::mutex> lck(m_mtx_snake);
+    m_mapSnake.clear();
+}
+
 void CGameClient::random_make_snake()
 {
     int cox, coy, value = 0;
     for(auto iter = m_mapSnake.begin(); iter != m_mapSnake.end(); ++ iter)
     {
+        std::cout << "cid = " << iter->first << std::endl;
         while(1)
         {
             cox = 1 + rand() % (MAP_H - 2);
             coy = 1 + rand() % (MAP_W - 2);
+            std::cout << "cox = " << cox << ", coy = " << coy << std::endl;
             value = m_map[cox][coy];
             if(value != MapType::SNAKE)
             {
@@ -888,8 +918,8 @@ void CGameClient::random_make_snake()
                     m_map[cox-1][coy] = MapType::SNAKE;
                     m_map.inc_overlap(cox, coy);
                     m_map.inc_overlap(cox-1, coy);
-                    iter->second.add_node(CSnakeNode(cox, coy));
-                    iter->second.add_node(CSnakeNode(cox-1, coy));
+                    iter->second->add_node(CSnakeNode(cox, coy));
+                    iter->second->add_node(CSnakeNode(cox-1, coy));
                     break;
                 }
                 else if(m_map[cox+1][coy] != MapType::SNAKE)
@@ -898,8 +928,8 @@ void CGameClient::random_make_snake()
                     m_map[cox+1][coy] = MapType::SNAKE;
                     m_map.inc_overlap(cox, coy);
                     m_map.inc_overlap(cox+1, coy);
-                    iter->second.add_node(CSnakeNode(cox, coy));
-                    iter->second.add_node(CSnakeNode(cox+1, coy));
+                    iter->second->add_node(CSnakeNode(cox, coy));
+                    iter->second->add_node(CSnakeNode(cox+1, coy));
                     break;
                 }
                 else if(m_map[cox][coy-1] != MapType::SNAKE)
@@ -908,8 +938,8 @@ void CGameClient::random_make_snake()
                     m_map[cox][coy-1] = MapType::SNAKE;
                     m_map.inc_overlap(cox, coy);
                     m_map.inc_overlap(cox, coy-1);
-                    iter->second.add_node(CSnakeNode(cox, coy));
-                    iter->second.add_node(CSnakeNode(cox, coy-1));
+                    iter->second->add_node(CSnakeNode(cox, coy));
+                    iter->second->add_node(CSnakeNode(cox, coy-1));
                     break;
                 }
                 else if(m_map[cox][coy+1] != MapType::SNAKE)
@@ -918,8 +948,8 @@ void CGameClient::random_make_snake()
                     m_map[cox][coy+1] = MapType::SNAKE;
                     m_map.inc_overlap(cox, coy);
                     m_map.inc_overlap(cox, coy+1);
-                    iter->second.add_node(CSnakeNode(cox, coy));
-                    iter->second.add_node(CSnakeNode(cox, coy+1));
+                    iter->second->add_node(CSnakeNode(cox, coy));
+                    iter->second->add_node(CSnakeNode(cox, coy+1));
                     break;
                 }
             }
@@ -1006,19 +1036,19 @@ void CGameClient::refresh_thread_func()
             switch(opttype)
             {
                 case GameOptType::MOVE_FORWARD:
-                    iter->second.move_forward();
+                    iter->second->move_forward();
                     break;
                 case GameOptType::MOVE_UP:
-                    iter->second.move_up();
+                    iter->second->move_up();
                     break;
                 case GameOptType::MOVE_DOWN:
-                    iter->second.move_down();
+                    iter->second->move_down();
                     break;
                 case GameOptType::MOVE_LEFT:
-                    iter->second.move_left();
+                    iter->second->move_left();
                     break;
                 case GameOptType::MOVE_RIGHT:
-                    iter->second.move_right();
+                    iter->second->move_right();
                     break;
                 default:
                     break;

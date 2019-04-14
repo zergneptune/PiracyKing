@@ -1219,6 +1219,26 @@ void CServerMng::do_game_start(std::shared_ptr<TTaskData>& pTask)
         root["res"] = 0;
         int nRandSeed = time(NULL);
         root["rand_seed"] = nRandSeed;
+        Json::Value game_players;
+        for(auto& cid : vecCids)
+        {
+            game_players.append(Json::Value(cid));
+        }
+        root["cids"] = game_players;
+
+        //通知该游戏房间下的所有玩家开始游戏
+        for(auto& cid : vecCids)
+        {
+            int sockfd = m_COnlinePlayers.get_sockfd(cid);
+            if(sockfd > 0)
+            {
+                m_queSendMsg.AddTask(make_shared<TTaskData>(
+                        0,
+                        sockfd,
+                        MsgType::GAME_START,
+                        fwriter.write(root)));
+            }
+        }
 
         m_pGameServer->game_start(gid);
     }
@@ -1227,20 +1247,12 @@ void CServerMng::do_game_start(std::shared_ptr<TTaskData>& pTask)
         root.clear();
         root["res"] = -2;
         root["msg"] = string("json解码失败.");
-    }
 
-    //通知该游戏房间下的所有玩家开始游戏
-    for(auto& cid : vecCids)
-    {
-        int sockfd = m_COnlinePlayers.get_sockfd(cid);
-        if(sockfd > 0)
-        {
-            m_queSendMsg.AddTask(make_shared<TTaskData>(
+        m_queSendMsg.AddTask(make_shared<TTaskData>(
                     0,
-                    sockfd,
+                    pTask->nSockfd,
                     MsgType::GAME_START,
                     fwriter.write(root)));
-        }
     }
 }
 
