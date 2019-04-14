@@ -1341,6 +1341,7 @@ void CServerMng::do_game_cmd(std::shared_ptr<TTaskData>& pTask)
         uint64_t gid = root["gid"].asUInt64();
         int cid = root["cid"].asInt();
         int cmd = root["cmd"].asInt();
+        printf("gid = %llu, cid = %d, cmd = %d\r\n", gid, cid, cmd);
         m_pGameServer->add_game_player_opt(gid, cid, static_cast<GameOptType>(cmd));
     }
 }

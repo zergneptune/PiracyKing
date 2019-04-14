@@ -391,6 +391,7 @@ void CGame::add_gameopt(G_ClientID client, GameOptType type)
 	auto iter = m_mapGameOpt.find(client);
 	if(iter != m_mapGameOpt.end())
 	{
+        printf("debug: addTask\r\n");
 		iter->second->AddTask(static_cast<int>(type));
 	}
 }
