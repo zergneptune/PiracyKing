@@ -37,6 +37,8 @@ public:
 
 	void set_start(std::shared_ptr<TTaskData>& pTask);
 
+	void send_game_player_cmd(std::shared_ptr<TTaskData>& pTask);
+
 	int request_start_game(uint64_t gid);
 
 	void game_start(uint64_t gid);
@@ -45,6 +47,8 @@ public:
 
 	int init(std::string ip, int port);
 
+public:
+	//测试
 	void recv_muticast();
 
 	void recv_broadcast();
@@ -88,11 +92,12 @@ private:
 
 	CSnowFlake		m_cSnowFlake;
 
-	CGameClient*	m_pGameClient;
-
 	std::mutex		m_mtx;
 
 	std::condition_variable 	m_cv;
 
 	bool			m_bGameStart;
+
+private:
+	CGameClient*	m_pGameClient;
 };

@@ -47,7 +47,8 @@ enum MsgType
 	QUIT_GAME_READY_RSP,
 	REQ_GAME_START,
 	GAME_START,
-	QUIT_GAME
+	QUIT_GAME,
+	GAME_PLAYER_CMD
 };
 
 #define IF_EXIT(predict, err) if(predict){ perror(err); exit(1); }
@@ -197,10 +198,20 @@ struct TTaskData
 	TTaskData(uint64_t id, int fd, MsgType type, std::string msg):
 		nTaskId(id), nSockfd(fd), msgType(type), strMsg(msg){}
 
+	TTaskData(MsgType type, uint64_t gid, int cid, int optType):
+		msgType(type), unGameID(gid), nClientID(cid), nOptType(optType){}
+
 	uint64_t		nTaskId;	//任务id，唯一表示本次任务
 	int 			nSockfd;	//sockfd
 	MsgType 		msgType;	//消息类型
+
+	//通用任务数据
 	std::string 	strMsg;		//消息内容
+
+	//玩家游戏命令任务数据
+	uint64_t      	unGameID;
+    int         	nClientID;
+    int         	nOptType;
 };
 
 struct TMsgHead

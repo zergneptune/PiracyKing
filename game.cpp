@@ -606,6 +606,16 @@ int CGameServer::add_player(G_GameID gid, int cid)
     return -2;
 }
 
+void CGameServer::add_game_player_opt(G_GameID gid, int cid, GameOptType type)
+{
+    std::lock_guard<std::mutex> lck(m_mtx);
+    auto iter = m_mapGame.find(gid);
+    if(iter != m_mapGame.end())
+    {
+        iter->second->add_gameopt(cid, type);
+    }
+}
+
 int CGameServer::game_ready(G_GameID gid, int cid)
 {
     std::lock_guard<std::mutex> lck(m_mtx);
@@ -752,7 +762,7 @@ int CGameServer::get_player_nums(G_GameID id)
     return -1;
 }
 
-CGameClient::CGameClient(){}
+CGameClient::CGameClient(TASK_QUE* p): m_pTaskData(p){}
 
 CGameClient::~CGameClient(){}
 
@@ -765,7 +775,7 @@ void CGameClient::init()
     m_map.random_make_food();
 }
 
-void CGameClient::play(int port)
+void CGameClient::play(int gid, int cid, int port)
 {
     init();//初始化
     m_bExitRecvFrame = false;
@@ -848,10 +858,11 @@ void CGameClient::play(int port)
                     break;
             }
 
-            m_queGameCmd.AddTask(std::make_shared<TGameCmd>(
-                m_gameID,
-                m_clientID,
-                opttype));
+            m_pTaskData->AddTask(std::make_shared<TTaskData>(
+                    MsgType::GAME_PLAYER_CMD,
+                    gid,
+                    cid,
+                    opttype));
         }
         //确保两次连续的按下ESC键，才退出
         if(buf[0] == 27 && i == 1)
@@ -1005,7 +1016,7 @@ void CGameClient::recv_frame_thread_func(int port)
             &srvaddr_len);
         IF_EXIT(res < 0, "recvfrom");
 
-        printf("recv res = %d\r\n", res);
+        //printf("recv res = %d\r\n", res);
         pframe = reinterpret_cast<TGameFrame*>(buffer);
         m_queGameFrame.AddTask(std::make_shared<TGameFrame>(*pframe));
     }

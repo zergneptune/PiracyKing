@@ -110,6 +110,8 @@ public:
 
 	void do_request_game_start(std::shared_ptr<TTaskData>& pTask);
 
+	void do_game_cmd(std::shared_ptr<TTaskData>& pTask);
+
 private:
 	void init_thread();
 
@@ -130,9 +132,10 @@ private:
 
 	TASK_QUE 		m_queTaskData;
 
-	CGameServer*	m_pGameServer;
-
 	CClientInfoMng	m_ClientInfoMng;
 
 	COnlinePlayers	m_COnlinePlayers;
+
+private:
+	CGameServer*	m_pGameServer;
 };

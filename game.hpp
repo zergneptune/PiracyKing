@@ -242,6 +242,8 @@ public:
 
     int add_player(G_GameID gid, int cid);
 
+    void add_game_player_opt(G_GameID gid, int cid, GameOptType type);
+
     int game_ready(G_GameID gid, int cid);
 
     int quit_game_ready(G_GameID gid, int cid);
@@ -283,10 +285,10 @@ class CGameClient
     typedef CTaskQueue<std::shared_ptr<TGameCmd>>   GameCmdQue;
     typedef std::map<G_ClientID, std::shared_ptr<CSnake>>   SnakeMap;
 public:
-    CGameClient();
+    CGameClient(TASK_QUE*);
     ~CGameClient();
 
-    void play(int port);
+    void play(int gid, int cid, int port);
 
     void set_random_seed(int seed){ m_nRandSeed = seed; }
 
@@ -312,7 +314,7 @@ private:
 
     SnakeMap        m_mapSnake;
 
-    GameCmdQue      m_queGameCmd;
+    GameCmdQue      m_QueGameCmd;
 
     GameFrameQue    m_queGameFrame;
 
@@ -320,11 +322,10 @@ private:
 
     bool            m_bExitRefresh;
 
-    G_GameID        m_gameID;
+    int             m_nRandSeed; //随机种子
 
-    G_ClientID      m_clientID;
-
-    int             m_nRandSeed;
+private:
+    TASK_QUE*       m_pTaskData;
 };
 
 

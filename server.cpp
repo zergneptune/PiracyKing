@@ -802,6 +802,9 @@ void CServerMng::task_proc_thread_func()
         TTaskData task;
         switch(pTask->msgType)
         {
+            case MsgType::GAME_PLAYER_CMD:
+                cout << "处理客户端游戏操作." << endl;
+                break;
             case MsgType::HEARTBEAT:
                 cout << "处理客户端心跳." << endl;
                 break;
@@ -1325,6 +1328,20 @@ void CServerMng::do_request_game_start(std::shared_ptr<TTaskData>& pTask)
                     pTask->nSockfd,
                     MsgType::REQ_GAME_START,
                     fwriter.write(root)));
+}
+
+void CServerMng::do_game_cmd(std::shared_ptr<TTaskData>& pTask)
+{
+    Json::Value root;
+    Json::FastWriter fwriter;
+    Json::Reader reader;
+    if(reader.parse(pTask->strMsg, root))
+    {
+        uint64_t gid = root["gid"].asUInt64();
+        int cid = root["cid"].asInt();
+        int cmd = root["cmd"].asInt();
+        m_pGameServer->add_game_player_opt(gid, cid, static_cast<GameOptType>(cmd));
+    }
 }
 
 int main()

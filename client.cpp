@@ -437,7 +437,7 @@ using namespace std;
 
 CClientMng::CClientMng()
 {
-    m_pGameClient = new CGameClient();
+    m_pGameClient = new CGameClient(&m_queTaskData);
 }
 
 CClientMng::~CClientMng(){}
@@ -449,6 +449,9 @@ void CClientMng::task_proc_thread_func()
         shared_ptr<TTaskData> pTask = m_queTaskData.Wait_GetTask();
         switch(pTask->msgType)
         {
+            case MsgType::GAME_PLAYER_CMD:
+                send_game_player_cmd(pTask);
+                break;
             case MsgType::HEARTBEAT:
                 cout << "心跳任务." << endl;
                 break;
@@ -1273,6 +1276,20 @@ void CClientMng::set_start(std::shared_ptr<TTaskData>& pTask)
     m_cv.notify_one();
 }
 
+void CClientMng::send_game_player_cmd(std::shared_ptr<TTaskData>& pTask)
+{
+    Json::Value root;
+    Json::FastWriter fwriter;
+    root["gid"] = pTask->unGameID;
+    root["cid"] = pTask->nClientID;
+    root["cmd"] = pTask->nOptType;
+    m_queSendMsg.AddTask(make_shared<TTaskData>(
+                                    0,
+                                    m_nServerSockfd,
+                                    GAME_PLAYER_CMD,
+                                    fwriter.write(root)));
+}
+
 int CClientMng::request_start_game(uint64_t gid)
 {
     uint64_t nSid = m_cSnowFlake.get_sid();
@@ -1327,7 +1344,7 @@ void CClientMng::game_start(uint64_t gid)
     cout << "进入游戏成功!" << endl;
 
     //进入游戏主循环
-    m_pGameClient->play(10010);
+    m_pGameClient->play(gid, m_nClientID, 10010);
 
     //退出游戏
     quit_game_ready(gid);
