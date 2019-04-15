@@ -612,6 +612,10 @@ void CGameServer::add_game_player_opt(G_GameID gid, int cid, GameOptType type)
 {
     std::lock_guard<std::mutex> lck(m_mtx);
     auto iter = m_mapGame.find(gid);
+    for(auto & ref_pair : m_mapGame)
+    {
+        printf("debug: gid = %llu\n", ref_pair.first);
+    }
     if(iter != m_mapGame.end())
     {
         iter->second->add_gameopt(cid, type);
