@@ -279,7 +279,7 @@ private:
 
 class CGameClient
 {
-    typedef int G_GameID;
+    typedef uint64_t G_GameID;
     typedef int G_ClientID;
     typedef CTaskQueue<std::shared_ptr<TGameFrame>> GameFrameQue;
     typedef CTaskQueue<std::shared_ptr<TGameCmd>>   GameCmdQue;

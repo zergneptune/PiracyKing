@@ -389,10 +389,8 @@ void CGame::add_gameopt(G_ClientID client, GameOptType type)
 {
 	std::lock_guard<std::mutex> lock(m_mtx);
 	auto iter = m_mapGameOpt.find(client);
-    printf("debug: to find client\r\n");
 	if(iter != m_mapGameOpt.end())
 	{
-        printf("debug: find client\r\n");
 		iter->second->AddTask(static_cast<int>(type));
 	}
 }
@@ -612,10 +610,6 @@ void CGameServer::add_game_player_opt(G_GameID gid, int cid, GameOptType type)
 {
     std::lock_guard<std::mutex> lck(m_mtx);
     auto iter = m_mapGame.find(gid);
-    for(auto & ref_pair : m_mapGame)
-    {
-        printf("debug: gid = %llu\n", ref_pair.first);
-    }
     if(iter != m_mapGame.end())
     {
         iter->second->add_gameopt(cid, type);
