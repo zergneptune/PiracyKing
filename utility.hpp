@@ -148,6 +148,8 @@ public:
 
 	bool Empty();
 
+	void clear();
+
 private:
 	std::queue<T> m_qTask;
 	std::mutex m_mtx;
@@ -190,6 +192,16 @@ bool CTaskQueue<T>::Empty()
 {
 	std::lock_guard<std::mutex> lck(m_mtx);
 	return m_qTask.empty();
+}
+
+template<typename T>
+void CTaskQueue<T>::clear()
+{
+	std::lock_guard<std::mutex> lck(m_mtx);
+	while(!m_qTask.empty())
+	{
+		m_qTask.pop();
+	}
 }
 
 struct TTaskData

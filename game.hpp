@@ -298,6 +298,8 @@ public:
 
     void clear_snake();
 
+    //void clear_game_data();
+
     void random_make_snake();
 
 private:

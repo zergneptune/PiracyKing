@@ -82,10 +82,6 @@ public:
 
 	void init();
 
-	void send_muticast();
-
-	void send_broadcast();
-
 	void do_regiser(std::shared_ptr<TTaskData>& pTask);
 
 	void do_login(std::shared_ptr<TTaskData>& pTask);
@@ -111,6 +107,11 @@ public:
 	void do_request_game_start(std::shared_ptr<TTaskData>& pTask);
 
 	void do_game_cmd(std::shared_ptr<TTaskData>& pTask);
+
+private:
+	void send_muticast();
+
+	void send_broadcast();
 
 private:
 	void init_thread();

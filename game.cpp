@@ -909,6 +909,13 @@ void CGameClient::clear_snake()
     m_mapSnake.clear();
 }
 
+/*void CGameClient::clear_game_data()
+{
+    std::lock_guard<std::mutex> lck(m_mtx_snake);
+    m_QueGameCmd.clear();
+    m_queGameFrame.clear();
+}*/
+
 void CGameClient::random_make_snake()
 {
     int cox, coy, value = 0;
@@ -1067,8 +1074,11 @@ void CGameClient::refresh_thread_func()
         }
         printf("\x1b[H\x1b[2J");
         m_map.refresh();
-        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+        std::this_thread::sleep_for(std::chrono::milliseconds(250));
     }
+
+    //清除本局游戏数据
+    m_queGameFrame.clear();
 }
 
 
