@@ -972,7 +972,6 @@ int CClientMng::create_room(uint64_t& gid, std::string& strRoomName)
         else
         {
             gid = root["gid"].asUInt64();
-            printf("debug: create gid = %llu\r\n", gid);
             strRoomName = root["gname"].asString();
         }
 

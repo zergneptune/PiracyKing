@@ -288,7 +288,7 @@ public:
     CGameClient(TASK_QUE*);
     ~CGameClient();
 
-    void play(int gid, int cid, int port);
+    void play(G_GameID gid, int cid, int port);
 
     void set_random_seed(int seed){ m_nRandSeed = seed; }
 
