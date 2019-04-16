@@ -468,7 +468,7 @@ void CGame::send_frame_thread_func(int port)
     		}
             else
             {
-                printf("debug: opttype = %d, frame_cnt = %d\r\n", opttype, frame_cnt);
+                printf("debug: cid = %d, opttype = %d, frame_cnt = %zu\r\n", iter->first, opttype, frame_cnt);
             }
 
     		temp_frame.optType[i++] = opttype;
@@ -484,7 +484,7 @@ void CGame::send_frame_thread_func(int port)
             sizeof(mcast_addr));
 
         //std::cout << "res = " << res << ", errno = " << errno << std::endl;
-        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+        std::this_thread::sleep_for(std::chrono::milliseconds(500));
     }
 
     //关闭套接字
@@ -1055,6 +1055,10 @@ void CGameClient::refresh_thread_func()
         for(auto iter = m_mapSnake.begin(); iter != m_mapSnake.end(); ++ iter)
         {
             opttype = pframe->optType[i++];
+            if(opttype != GameOptType::MOVE_FORWARD)
+            {
+                printf("debug: client recv opttype = %d\r\n", opttype);
+            }
             switch(opttype)
             {
                 case GameOptType::MOVE_FORWARD:
@@ -1078,7 +1082,7 @@ void CGameClient::refresh_thread_func()
         }
         printf("\x1b[H\x1b[2J");
         m_map.refresh();
-        std::this_thread::sleep_for(std::chrono::milliseconds(250));
+        std::this_thread::sleep_for(std::chrono::milliseconds(500));
     }
 
     //清除本局游戏数据
