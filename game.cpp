@@ -466,6 +466,10 @@ void CGame::send_frame_thread_func(int port)
     		{
     			opttype = GameOptType::MOVE_FORWARD;
     		}
+            else
+            {
+                printf("debug: opttype = %d, frame_cnt = %d\r\n", opttype, frame_cnt);
+            }
 
     		temp_frame.optType[i++] = opttype;
     	}
