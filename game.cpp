@@ -1055,10 +1055,6 @@ void CGameClient::refresh_thread_func()
         for(auto iter = m_mapSnake.begin(); iter != m_mapSnake.end(); ++ iter)
         {
             opttype = pframe->optType[i++];
-            if(opttype != GameOptType::MOVE_FORWARD)
-            {
-                printf("debug: client recv opttype = %d\r\n", opttype);
-            }
             switch(opttype)
             {
                 case GameOptType::MOVE_FORWARD:
@@ -1082,7 +1078,7 @@ void CGameClient::refresh_thread_func()
         }
         printf("\x1b[H\x1b[2J");
         m_map.refresh();
-        std::this_thread::sleep_for(std::chrono::milliseconds(500));
+        //std::this_thread::sleep_for(std::chrono::milliseconds(500));
     }
 
     //清除本局游戏数据
