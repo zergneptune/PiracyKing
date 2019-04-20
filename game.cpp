@@ -829,13 +829,13 @@ void CGameClient::play(G_GameID gid, int cid, int port)
     FD_SET(0, &rs);
     FD_ZERO(&rfds);
     FD_SET(0, &rfds);
-    tv.tv_sec = 0;
-    tv.tv_usec = 500*1000;
 
     i = 0; q = 0; dir = 0;
     int opttype = 0;
     while(1)
     {
+        tv.tv_sec = 0;
+        tv.tv_usec = 500*1000;
         r = select(0 + 1, &rfds, NULL, NULL, &tv); //0：监听标准输入，若r=1，说明标准输入可读，rfds中标准输入文件描述符会就绪
         if(r<0)
         {
