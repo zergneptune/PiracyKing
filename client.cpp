@@ -780,8 +780,11 @@ int CClientMng::player_list_menu(uint64_t nRoomId, std::string& strRoomName)
             }
             else if(nInput == 1)
             {
-                game_ready(nRoomId);
-                game_start(nRoomId);
+                nRes = game_ready(nRoomId);
+                if(nRes == 0)
+                {
+                    game_start(nRoomId);
+                }
             }
         }
     }
@@ -1196,7 +1199,6 @@ int CClientMng::wait_to_start()
     int r = 0;
 
     m_bGameStart = false;
-
     while(1)
     {
         r = select(0 + 1, &rfds, NULL, NULL, &tv);
