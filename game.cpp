@@ -1065,9 +1065,11 @@ void CGameClient::refresh_thread_func()
 {
     int opttype;
     int i = 0;
+    bool bRefresh = false;
     while(!m_bExitRefresh)
     {
         std::shared_ptr<TGameFrame> pframe = m_queGameFrame.Wait_GetTask();
+        bRefresh = true;
         i = 0;
         for(auto iter = m_mapSnake.begin(); iter != m_mapSnake.end(); ++ iter)
         {
@@ -1090,11 +1092,16 @@ void CGameClient::refresh_thread_func()
                     iter->second->move_right();
                     break;
                 default:
+                    bRefresh = false;
                     break;
             }
         }
-        printf("\x1b[H\x1b[2J");
-        m_map.refresh();
+
+        if(bRefresh)
+        {
+            printf("\x1b[H\x1b[2J");
+            m_map.refresh();
+        }
         //std::this_thread::sleep_for(std::chrono::milliseconds(500));
     }
 
