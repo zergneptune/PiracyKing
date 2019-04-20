@@ -246,7 +246,7 @@ public:
 class CSnake
 {
 public:
-    CSnake(CMap& map, CFood& food): m_map(map), m_food(food), m_strColor(RED){}
+    CSnake(CMap& map, CFood& food): m_map(map), m_food(food), m_strColor(RED), m_nSpeed(1){}
 
     ~CSnake(){}
 
@@ -308,63 +308,67 @@ public:
         }
     }
 
-    void move_up()
+    bool move_up()
     {
         std::lock_guard<std::mutex> lock(m_mt);
         auto iter = m_snake.begin();
         int x1 = iter->m_cox;
         ++ iter;
         int x2 = iter->m_cox;
-        if(x1 > x2) //如果蛇正在向下移动，那么禁止向上移动
+        if(x1 != x2) //如果蛇正在向下移动，那么禁止向上移动
         {
-            return;
+            return false;
         }
         move_core(-1, 0);
+        return true;
     }
 
-    void move_down()
+    bool move_down()
     {
         std::lock_guard<std::mutex> lock(m_mt);
         auto iter = m_snake.begin();
         int x1 = iter->m_cox;
         ++ iter;
         int x2 = iter->m_cox;
-        if(x1 < x2) //如果蛇正在向上移动，那么禁止向下移动
+        if(x1 != x2) //如果蛇正在向上移动，那么禁止向下移动
         {
-            return;
+            return false;
         }
         move_core(1, 0);
+        return true;
     }
 
-    void move_left()
+    bool move_left()
     {
         std::lock_guard<std::mutex> lock(m_mt);
         auto iter = m_snake.begin();
         int y1 = iter->m_coy;
         ++ iter;
         int y2 = iter->m_coy;
-        if(y1 > y2) //如果蛇正在向右移动，那么禁止向左移动
+        if(y1 != y2) //如果蛇正在向右移动，那么禁止向左移动
         {
-            return;
+            return false;
         }
         move_core(0, -1);
+        return true;
     }
 
-    void move_right()
+    bool move_right()
     {
         std::lock_guard<std::mutex> lock(m_mt);
         auto iter = m_snake.begin();
         int y1 = iter->m_coy;
         ++ iter;
         int y2 = iter->m_coy;
-        if(y1 < y2) //如果蛇正在向左移动，那么禁止向右移动
+        if(y1 != y2) //如果蛇正在向左移动，那么禁止向右移动
         {
-            return;
+            return false;
         }
         move_core(0, 1);
+        return true;
     }
 
-    void move_forward()
+    bool move_forward()
     {
         std::lock_guard<std::mutex> lock(m_mt);
         auto iter = m_snake.begin();
@@ -375,7 +379,7 @@ public:
         int y2 = iter->m_coy;
         if(x1 > x2)//向下移动
         {
-            move_core(1, 0);         
+            move_core(1, 0);    
         }
         else if(x1 < x2)//向上移动
         {
@@ -389,6 +393,7 @@ public:
         {
             move_core(0, -1);
         }
+        return true;
     }
 
     void set_color(std::string color)
@@ -402,6 +407,8 @@ public:
     }
 
 private:
+    void incr_speed(){ ++ m_nSpeed; }
+
     void move_core(int r_x, int r_y) //参数为相对移动距离
     {
         auto iter = m_snake.begin();
@@ -411,6 +418,11 @@ private:
         -- iter;
         int last_x = iter->m_cox;
         int last_y = iter->m_coy;
+        if(move_to_x < 0 || move_to_y < 0)
+        {
+            return;
+        }
+
         if(m_map[move_to_x][move_to_y] == MapType::BORDER)
         {
             return;
@@ -421,6 +433,7 @@ private:
             m_map[move_to_x][move_to_y] = MapType::SNAKE;
             m_map.inc_overlap(move_to_x, move_to_y);
             m_food.random_make();
+            incr_speed();
             return;
         }
 
@@ -446,6 +459,8 @@ private:
     std::mutex      m_mt;
 
     std::string     m_strColor;
+
+    int             m_nSpeed;
 };
 
 class CWorkThreadFunc
@@ -460,31 +475,35 @@ public:
     {
         m_bToExit = false;
         CommandType cmd_type = UNKNOWN;
+        bool bRefresh = false;
         while(!m_bToExit)
         {
             cmd_type = m_queCmd.Wait_GetTask();
             switch(cmd_type)
             {
                 case MOVE_FORWARD:
-                    m_snake.move_forward();
+                    bRefresh = m_snake.move_forward();
                     break;
                 case MOVE_UP:
-                    m_snake.move_up();
+                    bRefresh = m_snake.move_up();
                     break;
                 case MOVE_DOWN:
-                    m_snake.move_down();
+                    bRefresh = m_snake.move_down();
                     break;
                 case MOVE_LEFT:
-                    m_snake.move_left();
+                    bRefresh = m_snake.move_left();
                     break;
                 case MOVE_RIGHT:
-                    m_snake.move_right();
+                    bRefresh = m_snake.move_right();
                     break;
                 default:
                     break;
             }
-            printf("\x1b[H\x1b[2J");
-            m_map.refresh(m_snake.get_color());
+            if(bRefresh)
+            {
+                printf("\x1b[H\x1b[2J");
+                m_map.refresh(m_snake.get_color());
+            }
         }
     }
 
@@ -658,18 +677,8 @@ int main(int argc, char const *argv[])
 	cout << "A, C: " << std::is_same<A,C>::value << std::endl;
 	cout << "signed char, std::int8_t: " << std::is_same<signed char,std::int8_t>::value << std::endl;
 	*/
-    /*CGame game;
+    CGame game;
     game.init();
-    game.start();*/
-    CSnowFlake  snowflake(0);
-    std::vector<std::thread> v;
-    for(int i = 0; i < 4; ++ i)
-    {
-        v.push_back(std::thread(thread_func, &snowflake));
-    }
-
-    std::for_each(v.begin(), v.end(), [](std::thread& th){
-        th.join();
-    });
+    game.start();
     return 0;
 }

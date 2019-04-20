@@ -235,6 +235,11 @@ void CSnake::move_core(int r_x, int r_y) //参数为相对移动距离
     -- iter;
     int last_x = iter->m_cox;
     int last_y = iter->m_coy;
+    if(move_to_x < 0 || move_to_y < 0)
+    {
+        return;
+    }
+    
     if((*m_pMap)[move_to_x][move_to_y] == MapType::BORDER)
     {
         return;
@@ -251,7 +256,7 @@ void CSnake::move_core(int r_x, int r_y) //参数为相对移动距离
     (*m_pMap).inc_overlap(move_to_x, move_to_y);
     (*m_pMap)[move_to_x][move_to_y] = MapType::SNAKE;
     (*m_pMap).dec_overlap(last_x, last_y);//蛇尾离开，减少蛇尾位置重叠数
-    if((*m_pMap).get_overlap(last_x, last_y) < 1)//如果蛇尾位置没有重叠
+    if((*m_pMap).get_overlap(last_x, last_y) < 1)//如果蛇尾位置没有重叠数
     {
         (*m_pMap)[last_x][last_y] = MapType::BLANK;
     }
@@ -262,7 +267,13 @@ void CSnake::move_core(int r_x, int r_y) //参数为相对移动距离
 
 void CSnake::vanish()
 {
-
+    std::lock_guard<std::mutex> lock(m_mt);
+    for(auto iter = m_snake.begin(); iter != m_snake.end(); ++iter)
+    {
+        int cox = iter->m_cox;
+        int coy = iter->m_coy;
+        (*m_pMap)[cox][coy] = MapType::BLANK;
+    }
 }
 
 CGame::CGame(std::string strName): m_strRoomName(strName), m_roomOwner(-1){}
@@ -460,11 +471,11 @@ void CGame::send_frame_thread_func(int port)
     while(!m_bExitSendFrame)
     {
     	i = 0;
-    	for(auto iter = m_mapGameOpt.begin(); iter != m_mapGameOpt.end(); ++ iter)
+    	for(auto iter = m_mapGameOpt.begin(); iter != m_mapGameOpt.end(); ++iter)
     	{
     		if(iter->second->Try_GetTask(opttype) == false)
     		{
-    			opttype = GameOptType::MOVE_FORWARD;
+    			opttype = GameOptType::MOVE_NONE;
     		}
             else
             {
@@ -474,7 +485,7 @@ void CGame::send_frame_thread_func(int port)
     		temp_frame.optType[i++] = opttype;
     	}
 
-    	temp_frame.szFrameID = ++ frame_cnt;
+    	temp_frame.szFrameID = ++frame_cnt;
 
         res = sendto(sockfd,
             &temp_frame,
@@ -484,7 +495,7 @@ void CGame::send_frame_thread_func(int port)
             sizeof(mcast_addr));
 
         //std::cout << "res = " << res << ", errno = " << errno << std::endl;
-        std::this_thread::sleep_for(std::chrono::milliseconds(500));
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }
 
     //关闭套接字
@@ -818,30 +829,42 @@ void CGameClient::play(G_GameID gid, int cid, int port)
     FD_SET(0, &rs);
     FD_ZERO(&rfds);
     FD_SET(0, &rfds);
-    tv.tv_sec=0;
-    tv.tv_usec=0;
+    tv.tv_sec = 0;
+    tv.tv_usec = 500*1000;
 
     i = 0; q = 0; dir = 0;
     int opttype = 0;
     while(1)
     {
-        read(0 , buf+i, 1);
-        i++;
-        if(i>31)
-        {
-            write(1,"Too many data\n",14);
-            break;
-        }
         r = select(0 + 1, &rfds, NULL, NULL, &tv); //0：监听标准输入，若r=1，说明标准输入可读，rfds中标准输入文件描述符会就绪
         if(r<0)
         {
             write(1,"select() error.\n",16);
             break;
         }
-        if(r == 1)
+        else if(r == 1)
+        {
+            read(0, buf + i, 1);
+            ++i;
+            if(i > 31)
+            {
+                write(1,"Too many data\n",14);
+                break;
+            }
             continue;
+        }
+
         rfds = rs; //恢复rfds，即清除就绪的标准输入文件描述符
-        if(i == 3 && buf[0] == 0x1b && buf[1] == 0x5b)
+
+        if(i != 3 )
+        {
+            m_pTaskData->AddTask(std::make_shared<TTaskData>(
+                    MsgType::GAME_PLAYER_CMD,
+                    gid,
+                    cid,
+                    GameOptType::MOVE_FORWARD));
+        }
+        else if(buf[0] == 0x1b && buf[1] == 0x5b)
         {
             c = buf[2];
             switch(c)
@@ -868,6 +891,7 @@ void CGameClient::play(G_GameID gid, int cid, int port)
                     cid,
                     opttype));
         }
+
         //确保两次连续的按下ESC键，才退出
         if(buf[0] == 27 && i == 1)
         {
@@ -912,13 +936,6 @@ void CGameClient::clear_snake()
     std::lock_guard<std::mutex> lck(m_mtx_snake);
     m_mapSnake.clear();
 }
-
-/*void CGameClient::clear_game_data()
-{
-    std::lock_guard<std::mutex> lck(m_mtx_snake);
-    m_QueGameCmd.clear();
-    m_queGameFrame.clear();
-}*/
 
 void CGameClient::random_make_snake()
 {

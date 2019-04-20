@@ -30,7 +30,8 @@ enum MapType
 
 enum GameOptType
 {
-    MOVE_FORWARD = 0,
+    MOVE_NONE = 0,
+    MOVE_FORWARD,
     MOVE_UP,
     MOVE_DOWN,
     MOVE_LEFT,
@@ -297,8 +298,6 @@ public:
     void remove_snake(G_ClientID); //移走蛇的同时，清空地图上的位置
 
     void clear_snake();
-
-    //void clear_game_data();
 
     void random_make_snake();
 
