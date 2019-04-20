@@ -473,14 +473,15 @@ void CGame::send_frame_thread_func(int port)
     	i = 0;
     	for(auto iter = m_mapGameOpt.begin(); iter != m_mapGameOpt.end(); ++iter)
     	{
-    		if(iter->second->Try_GetTask(opttype) == false)
+            opttype = iter->second->Wait_GetTask();
+    		/*if(iter->second->Try_GetTask(opttype) == false)
     		{
     			opttype = GameOptType::MOVE_NONE;
     		}
             else
             {
                 printf("debug: cid = %d, opttype = %d, frame_cnt = %zu\r\n", iter->first, opttype, frame_cnt);
-            }
+            }*/
 
     		temp_frame.optType[i++] = opttype;
     	}
