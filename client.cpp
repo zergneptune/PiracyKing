@@ -518,6 +518,18 @@ void CClientMng::task_proc_thread_func()
                     pTask->nTaskId,
                     pTask->strMsg);
                 break;
+            case MsgType::RECV_READY_RSP:
+                cout << "接收游戏帧准备结果." << endl;
+                m_cEventNotice.Notice(
+                    pTask->nTaskId,
+                    pTask->strMsg);
+                break;
+            case MsgType::QUIT_RECV_READY_RSP:
+                cout << "退出接收游戏帧准备结果." << endl;
+                m_cEventNotice.Notice(
+                    pTask->nTaskId,
+                    pTask->strMsg);
+                break;
             case MsgType::REQ_GAME_START:
                 cout << "请求开始游戏结果." << endl;
                 m_cEventNotice.Notice(
@@ -1183,6 +1195,80 @@ int CClientMng::quit_game_ready(uint64_t gid)
     return -1;
 }
 
+int CClientMng::recv_frame_ready(uint64_t gid)
+{
+    uint64_t nSid = m_cSnowFlake.get_sid();
+    Json::Value root;
+    Json::FastWriter fwriter;
+    root["gid"] = gid;
+    root["cid"] = m_nClientID;
+    m_queSendMsg.AddTask(make_shared<TTaskData>(
+                                    nSid,
+                                    m_nServerSockfd,
+                                    RECV_READY,
+                                    fwriter.write(root)));
+    std::string result;
+    int nRet = m_cEventNotice.WaitNoticeFor(nSid, result, 10);
+    if(nRet < 0)
+    {
+        cout << "接收游戏帧准备超时！" << endl;
+        enter_any_key_to_continue();
+        return -1;
+    }
+
+    Json::Reader reader;
+    root.clear();
+    if(reader.parse(result, root))
+    {
+        nRet = root["res"].asInt();
+        if(nRet < 0)
+        {
+            cout << "接收游戏帧准备失败：" << root["msg"].asString() << endl;
+            enter_any_key_to_continue();
+        }
+
+        return nRet;
+    }
+    return -1;
+}
+
+int CClientMng::quit_recv_frame_ready(uint64_t gid)
+{
+    uint64_t nSid = m_cSnowFlake.get_sid();
+    Json::Value root;
+    Json::FastWriter fwriter;
+    root["gid"] = gid;
+    root["cid"] = m_nClientID;
+    m_queSendMsg.AddTask(make_shared<TTaskData>(
+                                    nSid,
+                                    m_nServerSockfd,
+                                    QUIT_RECV_READY,
+                                    fwriter.write(root)));
+    std::string result;
+    int nRet = m_cEventNotice.WaitNoticeFor(nSid, result, 10);
+    if(nRet < 0)
+    {
+        cout << "退出接收游戏帧准备超时！" << endl;
+        enter_any_key_to_continue();
+        return -1;
+    }
+
+    Json::Reader reader;
+    root.clear();
+    if(reader.parse(result, root))
+    {
+        nRet = root["res"].asInt();
+        if(nRet < 0)
+        {
+            cout << "退出接收游戏帧准备失败：" << root["msg"].asString() << endl;
+            enter_any_key_to_continue();
+        }
+
+        return nRet;
+    }
+    return -1;
+}
+
 int CClientMng::wait_to_start()
 {
     char buf[32];
@@ -1348,10 +1434,12 @@ void CClientMng::game_start(uint64_t gid)
     cout << "进入游戏成功!" << endl;
 
     //进入游戏主循环
+    recv_frame_ready(gid);
     m_pGameClient->play(gid, m_nClientID, 10010);
 
     //退出游戏
     quit_game_ready(gid);
+    quit_recv_frame_ready(gid);
     quit_game(gid);
 
     //移除客户端对应的蛇对象

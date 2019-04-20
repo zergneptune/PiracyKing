@@ -164,10 +164,20 @@ private:
 
 class CGame
 {
+    struct TPlayerStatus
+    {
+        TPlayerStatus(): m_nReadyGame(0), m_nReadyRecvFrame(0){}
+        ~TPlayerStatus(){}
+
+        int  m_nReadyGame;
+
+        int  m_nReadyRecvFrame;
+    };
+
     typedef int G_ClientID; //客户端
     typedef int G_RoomOwner;//房主
     typedef std::map<G_ClientID, std::shared_ptr<CTaskQueue<int>>> G_GameOptMap;
-    typedef std::map<G_ClientID, int> G_GameReadyMap;
+    typedef std::map<G_ClientID, TPlayerStatus> G_PlayerStatusMap;
 
 public:
     CGame(std::string strName);
@@ -183,13 +193,19 @@ public:
 
     bool ready(G_ClientID client);
 
+    bool ready_recv(G_ClientID client);
+
     bool quit_ready(G_ClientID client);
+
+    bool quit_ready_recv(G_ClientID client);
 
     bool get_ready_status(G_ClientID client);
 
     bool get_running_status();
 
     bool is_all_ready();
+
+    bool is_all_ready_recv();
 
     int get_client_nums();
 
@@ -210,17 +226,19 @@ private:
 
 private:
 
-    std::string     m_strRoomName;
+    std::string                 m_strRoomName;
 
-    G_GameOptMap    m_mapGameOpt;
+    G_GameOptMap                m_mapGameOpt;
 
-    G_GameReadyMap  m_mapGameReady;
+    G_PlayerStatusMap           m_mapPlayerStatus;
 
-    std::mutex      m_mtx;
+    std::mutex                  m_mtx;
 
-    bool            m_bExitSendFrame;
+    std::condition_variable     m_cv;
 
-    G_RoomOwner     m_roomOwner;
+    bool                        m_bExitSendFrame;
+
+    G_RoomOwner                 m_roomOwner;
 };
 
 class CGameServer
@@ -248,11 +266,17 @@ public:
 
     int quit_game_ready(G_GameID gid, int cid);
 
+    int recv_frame_ready(G_GameID gid, int cid);
+
+    int quit_recv_frame_ready(G_GameID gid, int cid);
+
     void game_start(G_GameID gid);
 
     void game_over(G_GameID gid);
 
     bool get_game_ready_status(G_GameID gid);
+
+    bool get_ready_recv_frame_status(G_GameID gid);
 
     bool get_game_running_status(G_GameID gid);
 

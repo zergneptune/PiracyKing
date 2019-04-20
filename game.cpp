@@ -282,6 +282,9 @@ CGame::~CGame(){}
 
 void CGame::start(int port)
 {
+    std::unique_lock<std::mutex> lck(m_mtx);
+    m_cv.wait(lck, [this](){ return is_all_ready_recv(); });
+
 	m_bExitSendFrame = false;
 	std::thread send_frame_thread([this, &port]()
         {
@@ -306,7 +309,7 @@ bool CGame::add_client(G_ClientID client)
 	m_mapGameOpt.insert(std::make_pair(client,
                             std::make_shared<CTaskQueue<int>>()));
 
-    m_mapGameReady.insert(std::make_pair(client, 0));
+    m_mapPlayerStatus.insert(std::make_pair(client, TPlayerStatus()));
     
     return true;
 }
@@ -320,10 +323,10 @@ bool CGame::remove_client(G_ClientID client)
         m_mapGameOpt.erase(iter_1);
     }
 
-    auto iter_2 = m_mapGameReady.find(client);
-    if(iter_2 != m_mapGameReady.end())
+    auto iter_2 = m_mapPlayerStatus.find(client);
+    if(iter_2 != m_mapPlayerStatus.end())
     {
-        m_mapGameReady.erase(iter_2);
+        m_mapPlayerStatus.erase(iter_2);
     }
 
     return true;
@@ -332,11 +335,25 @@ bool CGame::remove_client(G_ClientID client)
 bool CGame::ready(G_ClientID client)
 {
     std::lock_guard<std::mutex> lock(m_mtx);
-    auto iter = m_mapGameReady.find(client);
-    if(iter != m_mapGameReady.end())
+    auto iter = m_mapPlayerStatus.find(client);
+    if(iter != m_mapPlayerStatus.end())
     {
-        iter->second = 1;
+        iter->second.m_nReadyGame = 1;
     }
+
+    return true;
+}
+
+bool CGame::ready_recv(G_ClientID client)
+{
+    std::lock_guard<std::mutex> lock(m_mtx);
+    auto iter = m_mapPlayerStatus.find(client);
+    if(iter != m_mapPlayerStatus.end())
+    {
+        iter->second.m_nReadyRecvFrame = 1;
+    }
+
+    m_cv.notify_one();
 
     return true;
 }
@@ -344,13 +361,25 @@ bool CGame::ready(G_ClientID client)
 bool CGame::quit_ready(G_ClientID client)
 {
     std::lock_guard<std::mutex> lock(m_mtx);
-    auto iter = m_mapGameReady.find(client);
-    if(iter != m_mapGameReady.end())
+    auto iter = m_mapPlayerStatus.find(client);
+    if(iter != m_mapPlayerStatus.end())
     {
         if(iter->first != m_roomOwner) //房主默认始终处于准备状态
         {
-            iter->second = 0;
+            iter->second.m_nReadyGame = 0;
         }
+    }
+
+    return true;
+}
+
+bool CGame::quit_ready_recv(G_ClientID client)
+{
+    std::lock_guard<std::mutex> lock(m_mtx);
+    auto iter = m_mapPlayerStatus.find(client);
+    if(iter != m_mapPlayerStatus.end())
+    {
+        iter->second.m_nReadyRecvFrame = 0;
     }
 
     return true;
@@ -358,19 +387,26 @@ bool CGame::quit_ready(G_ClientID client)
 
 bool CGame::get_ready_status(G_ClientID client)
 {
-    return m_mapGameReady[client];
+    std::lock_guard<std::mutex> lock(m_mtx);
+    auto iter = m_mapPlayerStatus.find(client);
+    if(iter != m_mapPlayerStatus.end())
+    {
+        return iter->second.m_nReadyGame;
+    }
+
+    return false;
 }
 
 bool CGame::get_running_status()
 {
     std::lock_guard<std::mutex> lock(m_mtx);
-    int nPlayerNum = m_mapGameReady.size();
+    int nPlayerNum = m_mapPlayerStatus.size();
     int nQuitReadyCnt = 0;
-    for(auto iter = m_mapGameReady.begin(); iter != m_mapGameReady.end(); ++ iter)
+    for(auto iter = m_mapPlayerStatus.begin(); iter != m_mapPlayerStatus.end(); ++iter)
     {
-        if(iter->second == 0)
+        if(iter->second.m_nReadyGame == 0)
         {
-            ++ nQuitReadyCnt;
+            ++nQuitReadyCnt;
         }
     }
 
@@ -385,9 +421,23 @@ bool CGame::get_running_status()
 bool CGame::is_all_ready()
 {
     std::lock_guard<std::mutex> lock(m_mtx);
-    for(auto iter = m_mapGameReady.begin(); iter != m_mapGameReady.end(); ++ iter)
+    for(auto iter = m_mapPlayerStatus.begin(); iter != m_mapPlayerStatus.end(); ++iter)
     {
-        if(iter->second == 0)
+        if(iter->second.m_nReadyGame == 0)
+        {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+bool CGame::is_all_ready_recv()
+{
+    std::lock_guard<std::mutex> lock(m_mtx);
+    for(auto iter = m_mapPlayerStatus.begin(); iter != m_mapPlayerStatus.end(); ++iter)
+    {
+        if(iter->second.m_nReadyRecvFrame == 0)
         {
             return false;
         }
@@ -430,7 +480,7 @@ int CGame::set_room_owner()
     if(iter != m_mapGameOpt.end())
     {
         m_roomOwner = iter->first;
-        m_mapGameReady[m_roomOwner] = 1; //房主默认准备
+        m_mapPlayerStatus[m_roomOwner].m_nReadyGame = 1; //房主默认准备
         return m_roomOwner;
     }
 
@@ -444,7 +494,7 @@ int CGame::set_room_owner(G_ClientID cid)
     if(iter != m_mapGameOpt.end())
     {
         m_roomOwner = cid;
-        m_mapGameReady[m_roomOwner] = 1; //房主默认准备
+        m_mapPlayerStatus[m_roomOwner].m_nReadyGame = 1; //房主默认准备
         return cid;
     }
 
@@ -657,6 +707,32 @@ int CGameServer::quit_game_ready(G_GameID gid, int cid)
     return -1;
 }
 
+int CGameServer::recv_frame_ready(G_GameID gid, int cid)
+{
+    std::lock_guard<std::mutex> lck(m_mtx);
+    auto iter = m_mapGame.find(gid);
+    if(iter != m_mapGame.end())
+    {
+        iter->second->ready_recv(cid);
+        return 0;
+    }
+    
+    return -1;
+}
+
+int CGameServer::quit_recv_frame_ready(G_GameID gid, int cid)
+{
+    std::lock_guard<std::mutex> lck(m_mtx);
+    auto iter = m_mapGame.find(gid);
+    if(iter != m_mapGame.end())
+    {
+        iter->second->quit_ready_recv(cid);
+        return 0;
+    }
+    
+    return -1;
+}
+
 void CGameServer::game_start(G_GameID gid)
 {
     std::lock_guard<std::mutex> lck(m_mtx);
@@ -684,6 +760,21 @@ bool CGameServer::get_game_ready_status(G_GameID gid)
     if(iter != m_mapGame.end())
     {
         if(iter->second->is_all_ready())
+        {
+            return true;
+        }
+    }
+    
+    return false;
+}
+
+bool CGameServer::get_ready_recv_frame_status(G_GameID gid)
+{
+    std::lock_guard<std::mutex> lck(m_mtx);
+    auto iter = m_mapGame.find(gid);
+    if(iter != m_mapGame.end())
+    {
+        if(iter->second->is_all_ready_recv())
         {
             return true;
         }
