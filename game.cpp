@@ -495,7 +495,7 @@ void CGame::send_frame_thread_func(int port)
             sizeof(mcast_addr));
 
         //std::cout << "res = " << res << ", errno = " << errno << std::endl;
-        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
     }
 
     //关闭套接字
@@ -835,7 +835,7 @@ void CGameClient::play(G_GameID gid, int cid, int port)
     while(1)
     {
         tv.tv_sec = 0;
-        tv.tv_usec = 500*1000;
+        tv.tv_usec = 500000;
         r = select(0 + 1, &rfds, NULL, NULL, &tv); //0：监听标准输入，若r=1，说明标准输入可读，rfds中标准输入文件描述符会就绪
         if(r<0)
         {
