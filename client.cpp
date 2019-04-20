@@ -780,6 +780,7 @@ int CClientMng::player_list_menu(uint64_t nRoomId, std::string& strRoomName)
             }
             else if(nInput == 1)
             {
+                printf("(提示: 输入0退出游戏准备)\r\n");
                 nRes = game_ready(nRoomId);
                 if(nRes == 0)
                 {
