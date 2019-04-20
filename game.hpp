@@ -30,8 +30,7 @@ enum MapType
 
 enum GameOptType
 {
-    MOVE_NONE = 0,
-    MOVE_FORWARD,
+    MOVE_FORWARD = 0,
     MOVE_UP,
     MOVE_DOWN,
     MOVE_LEFT,

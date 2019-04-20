@@ -471,22 +471,21 @@ void CGame::send_frame_thread_func(int port)
     while(!m_bExitSendFrame)
     {
     	i = 0;
-    	for(auto iter = m_mapGameOpt.begin(); iter != m_mapGameOpt.end(); ++iter)
+    	for(auto iter = m_mapGameOpt.begin(); iter != m_mapGameOpt.end(); ++ iter)
     	{
-            opttype = iter->second->Wait_GetTask();
-    		/*if(iter->second->Try_GetTask(opttype) == false)
+    		if(iter->second->Try_GetTask(opttype) == false)
     		{
-    			opttype = GameOptType::MOVE_NONE;
+    			opttype = GameOptType::MOVE_FORWARD;
     		}
             else
             {
                 printf("debug: cid = %d, opttype = %d, frame_cnt = %zu\r\n", iter->first, opttype, frame_cnt);
-            }*/
+            }
 
     		temp_frame.optType[i++] = opttype;
     	}
 
-    	temp_frame.szFrameID = ++frame_cnt;
+    	temp_frame.szFrameID = ++ frame_cnt;
 
         res = sendto(sockfd,
             &temp_frame,
@@ -496,7 +495,7 @@ void CGame::send_frame_thread_func(int port)
             sizeof(mcast_addr));
 
         //std::cout << "res = " << res << ", errno = " << errno << std::endl;
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        std::this_thread::sleep_for(std::chrono::milliseconds(500));
     }
 
     //关闭套接字
@@ -830,13 +829,20 @@ void CGameClient::play(G_GameID gid, int cid, int port)
     FD_SET(0, &rs);
     FD_ZERO(&rfds);
     FD_SET(0, &rfds);
+    tv.tv_sec = 0;
+    tv.tv_usec = 0;
 
     i = 0; q = 0; dir = 0;
     int opttype = 0;
     while(1)
     {
-        tv.tv_sec = 0;
-        tv.tv_usec = 500000;
+        read(0, buf + i, 1);
+        ++i;
+        if(i > 31)
+        {
+            write(1,"Too many data\n",14);
+            break;
+        }
         r = select(0 + 1, &rfds, NULL, NULL, &tv); //0：监听标准输入，若r=1，说明标准输入可读，rfds中标准输入文件描述符会就绪
         if(r<0)
         {
@@ -845,27 +851,12 @@ void CGameClient::play(G_GameID gid, int cid, int port)
         }
         else if(r == 1)
         {
-            read(0, buf + i, 1);
-            ++i;
-            if(i > 31)
-            {
-                write(1,"Too many data\n",14);
-                break;
-            }
             continue;
         }
 
         rfds = rs; //恢复rfds，即清除就绪的标准输入文件描述符
 
-        if(i != 3 )
-        {
-            m_pTaskData->AddTask(std::make_shared<TTaskData>(
-                    MsgType::GAME_PLAYER_CMD,
-                    gid,
-                    cid,
-                    GameOptType::MOVE_FORWARD));
-        }
-        else if(buf[0] == 0x1b && buf[1] == 0x5b)
+        if(i == 3 && buf[0] == 0x1b && buf[1] == 0x5b)
         {
             c = buf[2];
             switch(c)
@@ -1066,11 +1057,9 @@ void CGameClient::refresh_thread_func()
 {
     int opttype;
     int i = 0;
-    bool bRefresh = false;
     while(!m_bExitRefresh)
     {
         std::shared_ptr<TGameFrame> pframe = m_queGameFrame.Wait_GetTask();
-        bRefresh = true;
         i = 0;
         for(auto iter = m_mapSnake.begin(); iter != m_mapSnake.end(); ++ iter)
         {
@@ -1093,16 +1082,11 @@ void CGameClient::refresh_thread_func()
                     iter->second->move_right();
                     break;
                 default:
-                    bRefresh = false;
                     break;
             }
         }
-
-        if(bRefresh)
-        {
-            printf("\x1b[H\x1b[2J");
-            m_map.refresh();
-        }
+        printf("\x1b[H\x1b[2J");
+        m_map.refresh();
         //std::this_thread::sleep_for(std::chrono::milliseconds(500));
     }
 
