@@ -1354,10 +1354,10 @@ void CClientMng::set_start(std::shared_ptr<TTaskData>& pTask)
             m_bGameStart = true;
         }
         
-        for(int i = 0; i < 5; ++ i)
+        for(int i = 0; i < 3; ++ i)
         {
             printf("\x1b[H\x1b[2J");
-            printf("游戏即将开始: %ds\r\n", 5 - i);
+            printf("游戏即将开始: %ds\r\n", 3 - i);
             std::this_thread::sleep_for(std::chrono::seconds(1));
         }
     }
@@ -1434,12 +1434,10 @@ void CClientMng::game_start(uint64_t gid)
     cout << "进入游戏成功!" << endl;
 
     //进入游戏主循环
-    recv_frame_ready(gid);
     m_pGameClient->play(gid, m_nClientID, 10010);
 
     //退出游戏
     quit_game_ready(gid);
-    quit_recv_frame_ready(gid);
     quit_game(gid);
 
     //移除客户端对应的蛇对象
@@ -1526,7 +1524,7 @@ int CClientMng::init_thread()
 
 int main()
 {
-	string IP("192.168.2.143");
+	string IP("192.168.1.188");
 	int port = 10086;
 	//std::cout<< "请输入ip: ";
 	//cin>>IP;

@@ -282,9 +282,9 @@ CGame::~CGame(){}
 
 void CGame::start(int port)
 {
-    std::unique_lock<std::mutex> lck(m_mtx);
-    m_cv.wait(lck, [this](){ return is_all_ready_recv(); });
-
+    //std::unique_lock<std::mutex> lck(m_mtx);
+    //m_cv.wait(lck, [this](){ return is_all_ready_recv(); })
+    std::this_thread::sleep_for(std::chrono::seconds(5));
 	m_bExitSendFrame = false;
 	std::thread send_frame_thread([this, &port]()
         {
