@@ -753,6 +753,12 @@ void CServerMng::start(int port)
                         string("789"),
                         string("789"),
                         string("sanji")));
+    m_ClientInfoMng.add_client(4,
+                    TClientInfo(
+                        4,
+                        string("000"),
+                        string("000"),
+                        string("usopp")));
     /**************************************************/
     std::thread listenThread([this, port]()
         {
