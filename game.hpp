@@ -132,6 +132,8 @@ public:
 
     void move_forward();
 
+    GameOptType get_move_direction();
+
     void set_color(std::string color)
     {
         m_strColor = color;
@@ -326,6 +328,8 @@ public:
 
 private:
     void init();
+
+    bool is_valid_move(int cid, GameOptType opttype);
 
     void recv_frame_thread_func(int port);
 

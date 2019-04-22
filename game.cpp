@@ -150,7 +150,8 @@ void CSnake::move_up()
     int x1 = iter->m_cox;
     ++ iter;
     int x2 = iter->m_cox;
-    if(x1 > x2) //如果蛇正在向下移动，那么禁止向上移动
+    //if(x1 > x2) //如果蛇正在向下移动，那么禁止向上移动
+    if(x1 != x2)
     {
         return;
     }
@@ -164,7 +165,8 @@ void CSnake::move_down()
     int x1 = iter->m_cox;
     ++ iter;
     int x2 = iter->m_cox;
-    if(x1 < x2) //如果蛇正在向上移动，那么禁止向下移动
+    //if(x1 < x2) //如果蛇正在向上移动，那么禁止向下移动
+    if(x1 != x2)
     {
         return;
     }
@@ -178,7 +180,8 @@ void CSnake::move_left()
     int y1 = iter->m_coy;
     ++ iter;
     int y2 = iter->m_coy;
-    if(y1 > y2) //如果蛇正在向右移动，那么禁止向左移动
+    //if(y1 > y2) //如果蛇正在向右移动，那么禁止向左移动
+    if(y1 != y2)
     {
         return;
     }
@@ -192,7 +195,8 @@ void CSnake::move_right()
     int y1 = iter->m_coy;
     ++ iter;
     int y2 = iter->m_coy;
-    if(y1 < y2) //如果蛇正在向左移动，那么禁止向右移动
+    //if(y1 < y2) //如果蛇正在向左移动，那么禁止向右移动
+    if(y1 != y2)
     {
         return;
     }
@@ -223,6 +227,33 @@ void CSnake::move_forward()
     else
     {
         move_core(0, -1);
+    }
+}
+
+GameOptType CSnake::get_move_direction()
+{
+    std::lock_guard<std::mutex> lock(m_mt);
+    auto iter = m_snake.begin();
+    int x1 = iter->m_cox;
+    int y1 = iter->m_coy;
+    ++ iter;
+    int x2 = iter->m_cox;
+    int y2 = iter->m_coy;
+    if(x1 > x2)//向下移动
+    {
+        return GameOptType::MOVE_DOWN;
+    }
+    else if(x1 < x2)//向上移动
+    {
+        return GameOptType::MOVE_UP;
+    }
+    else if(y1 > y2)//向右移动
+    {
+        return GameOptType::MOVE_RIGHT;
+    }
+    else
+    {
+        return GameOptType::MOVE_LEFT;
     }
 }
 
@@ -881,6 +912,32 @@ void CGameClient::init()
     m_map.random_make_food();
 }
 
+bool CGameClient::is_valid_move(int cid, GameOptType opttype)
+{
+    std::lock_guard<std::mutex> lck(m_mtx_snake);
+    auto iter = m_mapSnake.find(cid);
+    if(iter != m_mapSnake.end())
+    {
+        GameOptType curr_snake_move = iter->second->get_move_direction();
+        if(opttype == GameOptType::MOVE_UP || opttype == GameOptType::MOVE_DOWN)
+        {
+            if(curr_snake_move == GameOptType::MOVE_LEFT || curr_snake_move == GameOptType::MOVE_RIGHT)
+            {
+                return true;
+            }
+        }
+        else if(opttype == GameOptType::MOVE_LEFT || opttype == GameOptType::MOVE_RIGHT)
+        {
+            if(curr_snake_move == GameOptType::MOVE_UP || curr_snake_move == GameOptType::MOVE_DOWN)
+            {
+                return true;
+            }
+        }
+    }
+
+    return false;
+}
+
 void CGameClient::play(G_GameID gid, int cid, int port)
 {
     init();//初始化
@@ -924,7 +981,7 @@ void CGameClient::play(G_GameID gid, int cid, int port)
     tv.tv_usec = 0;
 
     i = 0; q = 0; dir = 0;
-    int opttype = 0;
+    GameOptType opttype;
     while(1)
     {
         read(0, buf + i, 1);
@@ -968,11 +1025,14 @@ void CGameClient::play(G_GameID gid, int cid, int port)
                     break;
             }
 
-            m_pTaskData->AddTask(std::make_shared<TTaskData>(
+            if(is_valid_move(cid, opttype))
+            {
+                m_pTaskData->AddTask(std::make_shared<TTaskData>(
                     MsgType::GAME_PLAYER_CMD,
                     gid,
                     cid,
-                    opttype));
+                    static_cast<int>(opttype)));
+            }
         }
 
         //确保两次连续的按下ESC键，才退出
