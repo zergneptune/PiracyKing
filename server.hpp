@@ -98,10 +98,6 @@ public:
 
 	void do_quit_game_ready(std::shared_ptr<TTaskData>& pTask);
 
-	void do_recv_frame_ready(std::shared_ptr<TTaskData>& pTask);
-
-	void do_quit_recv_frame_ready(std::shared_ptr<TTaskData>& pTask);
-
 	void do_game_start(std::shared_ptr<TTaskData>& pTask);
 
 	void do_quit_game(std::shared_ptr<TTaskData>& pTask);

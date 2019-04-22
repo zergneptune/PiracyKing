@@ -168,12 +168,10 @@ class CGame
 {
     struct TPlayerStatus
     {
-        TPlayerStatus(): m_nReadyGame(0), m_nReadyRecvFrame(0){}
+        TPlayerStatus(): m_nReadyGame(0){}
         ~TPlayerStatus(){}
 
         int  m_nReadyGame;
-
-        int  m_nReadyRecvFrame;
     };
 
     typedef int G_ClientID; //客户端
@@ -195,19 +193,13 @@ public:
 
     bool ready(G_ClientID client);
 
-    bool ready_recv(G_ClientID client);
-
     bool quit_ready(G_ClientID client);
-
-    bool quit_ready_recv(G_ClientID client);
 
     bool get_ready_status(G_ClientID client);
 
     bool get_running_status();
 
     bool is_all_ready();
-
-    bool is_all_ready_recv();
 
     int get_client_nums();
 
@@ -268,17 +260,11 @@ public:
 
     int quit_game_ready(G_GameID gid, int cid);
 
-    int recv_frame_ready(G_GameID gid, int cid);
-
-    int quit_recv_frame_ready(G_GameID gid, int cid);
-
     void game_start(G_GameID gid);
 
     void game_over(G_GameID gid);
 
     bool get_game_ready_status(G_GameID gid);
-
-    bool get_ready_recv_frame_status(G_GameID gid);
 
     bool get_game_running_status(G_GameID gid);
 

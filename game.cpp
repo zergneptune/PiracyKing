@@ -375,20 +375,6 @@ bool CGame::ready(G_ClientID client)
     return true;
 }
 
-bool CGame::ready_recv(G_ClientID client)
-{
-    std::lock_guard<std::mutex> lock(m_mtx);
-    auto iter = m_mapPlayerStatus.find(client);
-    if(iter != m_mapPlayerStatus.end())
-    {
-        iter->second.m_nReadyRecvFrame = 1;
-    }
-
-    m_cv.notify_one();
-
-    return true;
-}
-
 bool CGame::quit_ready(G_ClientID client)
 {
     std::lock_guard<std::mutex> lock(m_mtx);
@@ -399,18 +385,6 @@ bool CGame::quit_ready(G_ClientID client)
         {
             iter->second.m_nReadyGame = 0;
         }
-    }
-
-    return true;
-}
-
-bool CGame::quit_ready_recv(G_ClientID client)
-{
-    std::lock_guard<std::mutex> lock(m_mtx);
-    auto iter = m_mapPlayerStatus.find(client);
-    if(iter != m_mapPlayerStatus.end())
-    {
-        iter->second.m_nReadyRecvFrame = 0;
     }
 
     return true;
@@ -455,20 +429,6 @@ bool CGame::is_all_ready()
     for(auto iter = m_mapPlayerStatus.begin(); iter != m_mapPlayerStatus.end(); ++iter)
     {
         if(iter->second.m_nReadyGame == 0)
-        {
-            return false;
-        }
-    }
-
-    return true;
-}
-
-bool CGame::is_all_ready_recv()
-{
-    std::lock_guard<std::mutex> lock(m_mtx);
-    for(auto iter = m_mapPlayerStatus.begin(); iter != m_mapPlayerStatus.end(); ++iter)
-    {
-        if(iter->second.m_nReadyRecvFrame == 0)
         {
             return false;
         }
@@ -738,32 +698,6 @@ int CGameServer::quit_game_ready(G_GameID gid, int cid)
     return -1;
 }
 
-int CGameServer::recv_frame_ready(G_GameID gid, int cid)
-{
-    std::lock_guard<std::mutex> lck(m_mtx);
-    auto iter = m_mapGame.find(gid);
-    if(iter != m_mapGame.end())
-    {
-        iter->second->ready_recv(cid);
-        return 0;
-    }
-    
-    return -1;
-}
-
-int CGameServer::quit_recv_frame_ready(G_GameID gid, int cid)
-{
-    std::lock_guard<std::mutex> lck(m_mtx);
-    auto iter = m_mapGame.find(gid);
-    if(iter != m_mapGame.end())
-    {
-        iter->second->quit_ready_recv(cid);
-        return 0;
-    }
-    
-    return -1;
-}
-
 void CGameServer::game_start(G_GameID gid)
 {
     std::lock_guard<std::mutex> lck(m_mtx);
@@ -791,21 +725,6 @@ bool CGameServer::get_game_ready_status(G_GameID gid)
     if(iter != m_mapGame.end())
     {
         if(iter->second->is_all_ready())
-        {
-            return true;
-        }
-    }
-    
-    return false;
-}
-
-bool CGameServer::get_ready_recv_frame_status(G_GameID gid)
-{
-    std::lock_guard<std::mutex> lck(m_mtx);
-    auto iter = m_mapGame.find(gid);
-    if(iter != m_mapGame.end())
-    {
-        if(iter->second->is_all_ready_recv())
         {
             return true;
         }

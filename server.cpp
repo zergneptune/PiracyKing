@@ -856,14 +856,6 @@ void CServerMng::task_proc_thread_func()
                 cout << "处理客户端退出游戏准备请求." << endl;
                 do_quit_game_ready(pTask);
                 break;
-            case MsgType::RECV_READY:
-                cout << "处理客户端接收游戏帧准备请求." << endl;
-                do_recv_frame_ready(pTask);
-                break;
-            case MsgType::QUIT_RECV_READY:
-                cout << "处理客户端退出接收游戏帧准备请求." << endl;
-                do_quit_recv_frame_ready(pTask);
-                break;
             case MsgType::REQ_GAME_START:
                 cout << "处理客户端请求开始游戏." << endl;
                 do_request_game_start(pTask);
@@ -1214,60 +1206,6 @@ void CServerMng::do_quit_game_ready(std::shared_ptr<TTaskData>& pTask)
                     pTask->nTaskId,
                     pTask->nSockfd,
                     MsgType::QUIT_GAME_READY_RSP,
-                    fwriter.write(root)));
-}
-
-void CServerMng::do_recv_frame_ready(std::shared_ptr<TTaskData>& pTask)
-{
-    Json::Value root;
-    Json::FastWriter fwriter;
-    Json::Reader reader;
-    if(reader.parse(pTask->strMsg, root))
-    {
-        uint64_t gid = root["gid"].asUInt64();
-        int cid = root["cid"].asInt();
-        m_pGameServer->recv_frame_ready(gid, cid);
-        root.clear();
-        root["res"] = 0;
-    }
-    else
-    {
-        root.clear();
-        root["res"] = -2;
-        root["msg"] = string("json解码失败.");
-    }
-
-    m_queSendMsg.AddTask(make_shared<TTaskData>(
-                    pTask->nTaskId,
-                    pTask->nSockfd,
-                    MsgType::RECV_READY_RSP,
-                    fwriter.write(root)));
-}
-
-void CServerMng::do_quit_recv_frame_ready(std::shared_ptr<TTaskData>& pTask)
-{
-    Json::Value root;
-    Json::FastWriter fwriter;
-    Json::Reader reader;
-    if(reader.parse(pTask->strMsg, root))
-    {
-        uint64_t gid = root["gid"].asUInt64();
-        int cid = root["cid"].asInt();
-        m_pGameServer->quit_recv_frame_ready(gid, cid);
-        root.clear();
-        root["res"] = 0;
-    }
-    else
-    {
-        root.clear();
-        root["res"] = -2;
-        root["msg"] = string("json解码失败.");
-    }
-
-    m_queSendMsg.AddTask(make_shared<TTaskData>(
-                    pTask->nTaskId,
-                    pTask->nSockfd,
-                    MsgType::QUIT_RECV_READY_RSP,
                     fwriter.write(root)));
 }
 

@@ -33,10 +33,6 @@ public:
 
 	int quit_game_ready(uint64_t gid);
 
-	int recv_frame_ready(uint64_t gid);
-
-	int quit_recv_frame_ready(uint64_t gid);
-
 	int wait_to_start();
 
 	void set_start(std::shared_ptr<TTaskData>& pTask);
