@@ -153,6 +153,7 @@ bool isPostOrderOfBST(int a[], int len)
 	return helper_isPostOrderOfBST(a, 0, len - 1);
 }
 
+#if 0
 int* CreateBC(char* pattern, int len)
 {
 	int* bc = new int[256];
@@ -188,21 +189,32 @@ int* CreateSuffix(char* pattern, int len)
 int* CreateGS(char* pattern, int len)
 {
 	int* suffix = CreateSuffix(pattern, len);
+
+	for(int i = 0; i < len; ++i)
+	{
+		cout << "suffix[" << i << "] = " << suffix[i] << endl;
+	}
+
 	int* gs = new int[len];
+
+	gs[len - 1] = 1;
+
 	/*
 	在计算gs数组时，从移动数最大的情况依次到移动数最少的情况赋值，
 	确保在合理的移动范围内，移动最少的距离，避免失配的情况。
 	*/
-	for(int i = 1; i < len; ++i)
+	for(int i = 0; i <= len - 2; ++i)
 	{
 		gs[i] = len;
 	}
 
-	for(int i = len - 1; i >= 0; --i) //从右往左扫描，确保模式串移动最少。
+	int j = 0;
+
+	for(int i = len - 2; i >= 0; --i) //从右往左扫描，确保模式串移动最少。
 	{
 		if(suffix[i] == i + 1) //是一个与好后缀匹配的最大前缀
 		{
-			for(int j = 0; j < len - 1 - i; ++j)
+			for(; j < len - 1 - i; ++j)
 			{
 				if(gs[j] == len) //gs[j]初始值为len, 这样确保gs[j]只被修改一次
 				{
@@ -212,9 +224,26 @@ int* CreateGS(char* pattern, int len)
 		}
 	}
 
-	for(int i = 0; i < len - 1; ++i)
+	for(int i = 0; i < len; ++i)
 	{
-		gs[len - 1 - suffix[i]] = len - 1 - i;
+		cout << "before gs[" << i << "] = " << gs[i] << endl;
+	}
+
+	for(int i = len - 2; i >= 0; --i)
+	{
+		for(j = len - 2; j >= 0; --j)
+		{
+			if(suffix[j] >= len - 1 - i)
+			{
+				gs[i] = len - 1 - j;
+				break;
+			}
+		}
+	}
+
+	for(int i = 0; i < len; ++i)
+	{
+		cout << "gs[" << i << "] = " << gs[i] << endl;
 	}
 
 	return gs;
@@ -224,6 +253,11 @@ int bm_search(char* text, int text_len, char* pattern, int pattern_len)
 {
 	int* bc = CreateBC(pattern, pattern_len);
 	int* gs = CreateGS(pattern, pattern_len);
+
+	for(int i = 0; i < 256; ++i)
+	{
+		cout << "bc[" << char(i) << "] = " << bc[i] << endl;
+	}
 
 	for(int i = 0; i <= text_len - pattern_len; )
 	{
@@ -242,7 +276,7 @@ int bm_search(char* text, int text_len, char* pattern, int pattern_len)
 		int bc_move = bad_char_index - bc[bad_char];
 		if(bc_move < 0)
 		{
-			bc_move = bad_char_index + 1;
+			bc_move = 1;
 		}
 
 		int gs_move = gs[bad_char_index];
@@ -258,6 +292,136 @@ int bm_search(char* text, int text_len, char* pattern, int pattern_len)
 		bc = NULL;
 	}
 
+	if(gs != NULL)
+	{
+		delete bc;
+		gs = NULL;
+	}
+	return -1;
+}
+#endif
+
+int* CreateBC(char* pattern, int len)
+{
+	int* bc = new int[256];
+ 
+	for(int i = 0; i < 256; ++i)
+	{
+		bc[i] = -1;
+	}
+ 
+	for(int i = 0; i < len; ++i)
+	{
+		bc[pattern[i]] = i;
+	}
+ 
+	for(int i = 0; i < 256; ++i)
+	{
+		if(bc[i] != -1)
+		{
+			cout << "bc[" << i << "] = " << bc[i] << endl;
+		}
+	}
+	return bc;
+}
+ 
+int* CreateSuffix(char* pattern, int len)
+{
+	int* suffix = new int[len];
+	suffix[len - 1] = len;
+ 
+	for(int i = len - 2; i >= 0; --i)
+	{
+		int j = i;
+		for(; pattern[j] == pattern[len - 1 - i + j] && j >= 0; --j);
+		suffix[i] = i - j;
+	}
+ 
+	for(int i = 0; i < len; ++i)
+	{
+		cout << "suffix[" << i << "] = " << suffix[i] << endl;
+	}
+ 
+	return suffix;
+}
+ 
+int* CreateGS(char* pattern, int len)
+{
+	int* suffix = CreateSuffix(pattern, len);
+	int* gs = new int[len];
+	/*
+	在计算gs数组时，从移动数最大的情况依次到移动数最少的情况赋值，
+	确保在合理的移动范围内，移动最少的距离，避免失配的情况。
+	*/
+ 
+    //第三种情况
+	for(int i = 1; i < len; ++i)
+	{
+		gs[i] = len;
+	}
+ 
+    //第二种情况
+	for(int i = len - 1; i >= 0; --i) //从右往左扫描，确保模式串移动最少。
+	{
+		if(suffix[i] == i + 1) //是一个与好后缀匹配的最大前缀
+		{
+			for(int j = 0; j < len - 1 - i; ++j)
+			{
+				if(gs[j] == len) //gs[j]初始值为len, 这样确保gs[j]只被修改一次
+				{
+					gs[j] = len - 1 - i;
+				}
+			}
+		}
+	}
+ 
+    //第一种情况
+	for(int i = 0; i < len - 1; ++i)
+	{
+		gs[len - 1 - suffix[i]] = len - 1 - i;
+	}
+ 
+	return gs;
+}
+ 
+int bm_search(char* text, int text_len, char* pattern, int pattern_len)
+{
+	int* bc = CreateBC(pattern, pattern_len);
+	int* gs = CreateGS(pattern, pattern_len);
+ 
+	for(int i = 0; i <= text_len - pattern_len; )
+	{
+		cout << "i = " << i << endl;
+		int j = pattern_len - 1;
+		for(; j >= 0 && pattern[j] == text[i+j]; --j);
+ 
+		if(j < 0)
+		{
+			return i;
+		}
+ 
+		int bad_char_index = j;
+		char bad_char = text[i + j];
+ 
+		int bc_move = bad_char_index - bc[bad_char];
+		if(bc_move < 0)
+		{
+			bc_move = 1;
+		}
+ 
+		int gs_move = gs[bad_char_index];
+ 
+		int move = (bc_move > gs_move ? bc_move : gs_move);
+ 
+		i += move;
+	}
+ 
+	if(bc != NULL)
+	{
+		delete bc;
+		bc = NULL;
+	}
+ 
 	if(gs != NULL)
 	{
 		delete bc;

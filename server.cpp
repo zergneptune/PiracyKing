@@ -734,6 +734,7 @@ void CServerMng::start(int port)
     ** acounts: 123, passwd: 123, name: luffy
     ** acounts: 456, passwd: 456, name: zoro
     ** acounts: 789, passwd: 789, name: sanji
+    ** acounts: 000, passwd: 000, name: usopp
     */
     m_ClientInfoMng.add_client(1,
                     TClientInfo(

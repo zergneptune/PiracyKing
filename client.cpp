@@ -1355,6 +1355,7 @@ void CClientMng::game_start(uint64_t gid)
     quit_game(gid);
 
     //移除客户端对应的蛇对象
+    m_pGameClient->remove_snake(m_nClientID);
     m_pGameClient->clear_snake();
 }
 

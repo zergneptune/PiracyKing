@@ -677,8 +677,14 @@ int main(int argc, char const *argv[])
 	cout << "A, C: " << std::is_same<A,C>::value << std::endl;
 	cout << "signed char, std::int8_t: " << std::is_same<signed char,std::int8_t>::value << std::endl;
 	*/
-    CGame game;
+    /*CGame game;
     game.init();
-    game.start();
+    game.start();*/
+
+    char text[] = "ABACHOIEHGAAABAABAAABAAASDEOAAABAA";
+    char pattern[] = "AAABAABAAABAAA";
+
+    int res = bm_search(text, strlen(text), pattern, strlen(pattern));
+    std::cout << "res = " << res << std::endl;
     return 0;
 }

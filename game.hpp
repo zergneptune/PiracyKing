@@ -41,6 +41,8 @@ struct TGameFrame
 {
     size_t      szFrameID;
 
+    uint64_t    nGameId;
+
     int         optType[2];
 };
 
