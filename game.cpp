@@ -1212,7 +1212,6 @@ void CGameClient::refresh_thread_func()
         }
         printf("\x1b[H\x1b[2J");
         m_map.refresh();
-        std::this_thread::sleep_for(std::chrono::milliseconds(50));
     }
 }
 
