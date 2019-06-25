@@ -593,6 +593,7 @@ void CClientMng::recv_game_frame(int port)
     TGameFrameUdp* pGameFrame = NULL;
     while(1)
     {
+        printf("debug: client recvfrom\n");
         res = recvfrom(sockfd,
                         buffer,
                         sizeof(TGameFrameUdp),
@@ -600,6 +601,7 @@ void CClientMng::recv_game_frame(int port)
                         (struct sockaddr*)(&local_addr),
                         &srvaddr_len);
         IF_EXIT(res < 0, "recvfrom");
+        printf("debug: res = %d\n", res);
         pGameFrame = reinterpret_cast<TGameFrameUdp*>(buffer);
         m_pGameClient->add_game_frame(pGameFrame);
     }

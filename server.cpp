@@ -347,13 +347,16 @@ using namespace std;
                 vecGames.clear();
                 vecCids.clear();
                 m_pGameServer->get_game_list(vecGames);
+                printf("debug: vecGames size = ", vecGames.size());
                 for(auto iter = vecGames.begin(); iter != vecGames.end(); ++iter)
                 {
                     //如果游戏处于运行状态，那么广播该游戏的游戏帧
                     if((*iter)->is_game_running())
                     {
+                        printf("debug: game is running\n");
                         (*iter)->get_game_frame(gameFrame);
                         (*iter)->get_client_ids(vecCids);
+                        printf("debug: vecCids size = ", vecCids.size());
                         for(auto iter_2 = vecCids.begin();
                                 iter_2 != vecCids.end();
                                 ++iter_2)
@@ -366,6 +369,7 @@ using namespace std;
                                             0,
                                             (struct sockaddr*)(pUdpAddr.get()),
                                             sizeof(struct sockaddr_in));
+                                printf("debug: res = ", res);
                             }
                     }
                 }
@@ -728,6 +732,7 @@ void COnlinePlayers::add_player(SocketFd fd, ClientID cid)
     char ip[16] = { 0 };
     getpeername(fd, (struct sockaddr*)&client_addr, &addr_len);
     inet_ntop(AF_INET, &client_addr.sin_addr, ip, sizeof(ip));
+    printf("debug: client ip = %s\n", ip);
 
     memset(&client_addr, 0, sizeof(client_addr));
     client_addr.sin_family = AF_INET;
