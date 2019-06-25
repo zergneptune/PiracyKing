@@ -453,7 +453,6 @@ void CGame::add_gameopt(G_ClientID client, GameOptType type)
 
 void CGame::get_game_frame(TGameFrameUdp& temp_frame)
 {
-    size_t frame_cnt = 0;
     int i = 0;
     int opttype = 0;
     std::lock_guard<std::mutex> lock(m_mtx);
@@ -465,7 +464,7 @@ void CGame::get_game_frame(TGameFrameUdp& temp_frame)
         }
         else
         {
-            printf("debug: cid = %d, opttype = %d, frame_cnt = %zu\r\n", iter->first, opttype, frame_cnt);
+            printf("debug: cid = %d, opttype = %d, frame_cnt = %zu\r\n", iter->first, opttype, m_szGameFrameCnt);
         }
 
         temp_frame.nClientID[i] = iter->first;
@@ -1185,6 +1184,7 @@ void CGameClient::refresh_thread_func()
         {
             cid = pframe->nClientID[i];
             opttype = pframe->optType[i];
+            printf("debug: recv opttype = %d\n", opttype);
             auto iter = m_mapSnake.find(cid);
             if(iter != m_mapSnake.end())
             {
