@@ -351,10 +351,8 @@ using namespace std;
                     //如果游戏处于运行状态，那么广播该游戏的游戏帧
                     if((*iter)->is_game_running())
                     {
-                        printf("debug: game is running\n");
                         (*iter)->get_game_frame(gameFrame);
                         (*iter)->get_client_ids(vecCids);
-                        printf("debug: vecCids size = %lu\n", vecCids.size());
                         for(auto iter_2 = vecCids.begin();
                             iter_2 != vecCids.end();
                             ++iter_2)
@@ -363,14 +361,12 @@ using namespace std;
                                 m_COnlinePlayers.get_client_udp_addr(*iter_2);
                             if(pUdpAddr)
                             {
-                                printf("debug: server sendto cid = %d\n", *iter_2);
                                 res = sendto(sockfd,
                                             &gameFrame,
                                             sizeof(gameFrame),
                                             0,
                                             (struct sockaddr*)(pUdpAddr.get()),
                                             sizeof(struct sockaddr_in));
-                                printf("debug: res = %d\n", res);
                             }
                         }
                     }

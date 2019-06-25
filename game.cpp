@@ -1180,6 +1180,7 @@ void CGameClient::refresh_thread_func()
     int opttype;
     while(!m_bExitRefresh)
     {
+        printf("debug: wait get task\n");
         std::shared_ptr<TGameFrameUdp> pframe = m_queGameFrame.Wait_GetTask();
         printf("debug: get game frame\n");
         if(m_queGameFrame.Try_GetTask(pframe))
