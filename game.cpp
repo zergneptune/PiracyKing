@@ -1181,8 +1181,10 @@ void CGameClient::refresh_thread_func()
     while(!m_bExitRefresh)
     {
         std::shared_ptr<TGameFrameUdp> pframe = m_queGameFrame.Wait_GetTask();
+        printf("debug: get game frame\n");
         if(m_queGameFrame.Try_GetTask(pframe))
         {
+            printf("debug: refresh\n");
             for(int i = 0; i < m_mapSnake.size(); ++i)
             {
                 cid = pframe->nClientID[i];

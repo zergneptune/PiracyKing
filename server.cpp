@@ -340,14 +340,12 @@ using namespace std;
             TGameFrameUdp gameFrame;
             std::vector<std::shared_ptr<CGame>> vecGames;
             std::vector<int> vecCids;
-            std::shared_ptr<struct sockaddr_in> pUdpAddr;
 
             while(1)
             {
                 vecGames.clear();
                 vecCids.clear();
                 m_pGameServer->get_game_list(vecGames);
-                printf("debug: vecGames size = ", vecGames.size());
                 for(auto iter = vecGames.begin(); iter != vecGames.end(); ++iter)
                 {
                     //如果游戏处于运行状态，那么广播该游戏的游戏帧
@@ -356,21 +354,25 @@ using namespace std;
                         printf("debug: game is running\n");
                         (*iter)->get_game_frame(gameFrame);
                         (*iter)->get_client_ids(vecCids);
-                        printf("debug: vecCids size = ", vecCids.size());
+                        printf("debug: vecCids size = %lu\n", vecCids.size());
                         for(auto iter_2 = vecCids.begin();
-                                iter_2 != vecCids.end();
-                                ++iter_2)
-                            pUdpAddr = m_COnlinePlayers.get_client_udp_addr(*iter_2);
+                            iter_2 != vecCids.end();
+                            ++iter_2)
+                        {
+                            std::shared_ptr<struct sockaddr_in> pUdpAddr = \
+                                m_COnlinePlayers.get_client_udp_addr(*iter_2);
                             if(pUdpAddr)
                             {
+                                printf("debug: server sendto cid = %d\n", *iter_2);
                                 res = sendto(sockfd,
                                             &gameFrame,
                                             sizeof(gameFrame),
                                             0,
                                             (struct sockaddr*)(pUdpAddr.get()),
                                             sizeof(struct sockaddr_in));
-                                printf("debug: res = ", res);
+                                printf("debug: res = %d\n", res);
                             }
+                        }
                     }
                 }
                 std::this_thread::sleep_for(std::chrono::milliseconds(10));
