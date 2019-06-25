@@ -1180,44 +1180,39 @@ void CGameClient::refresh_thread_func()
     int opttype;
     while(!m_bExitRefresh)
     {
-        printf("debug: wait get task\n");
         std::shared_ptr<TGameFrameUdp> pframe = m_queGameFrame.Wait_GetTask();
-        printf("debug: get game frame\n");
-        if(m_queGameFrame.Try_GetTask(pframe))
+        for(int i = 0; i < m_mapSnake.size(); ++i)
         {
-            printf("debug: refresh\n");
-            for(int i = 0; i < m_mapSnake.size(); ++i)
+            cid = pframe->nClientID[i];
+            opttype = pframe->optType[i];
+            auto iter = m_mapSnake.find(cid);
+            if(iter != m_mapSnake.end())
             {
-                cid = pframe->nClientID[i];
-                opttype = pframe->optType[i];
-                auto iter = m_mapSnake.find(cid);
-                if(iter != m_mapSnake.end())
+                switch(opttype)
                 {
-                    switch(opttype)
-                    {
-                        case GameOptType::MOVE_FORWARD:
-                            iter->second->move_forward();
-                            break;
-                        case GameOptType::MOVE_UP:
-                            iter->second->move_up();
-                            break;
-                        case GameOptType::MOVE_DOWN:
-                            iter->second->move_down();
-                            break;
-                        case GameOptType::MOVE_LEFT:
-                            iter->second->move_left();
-                            break;
-                        case GameOptType::MOVE_RIGHT:
-                            iter->second->move_right();
-                            break;
-                        default:
-                            break;
-                    }
+                    case GameOptType::MOVE_FORWARD:
+                        iter->second->move_forward();
+                        break;
+                    case GameOptType::MOVE_UP:
+                        iter->second->move_up();
+                        break;
+                    case GameOptType::MOVE_DOWN:
+                        iter->second->move_down();
+                        break;
+                    case GameOptType::MOVE_LEFT:
+                        iter->second->move_left();
+                        break;
+                    case GameOptType::MOVE_RIGHT:
+                        iter->second->move_right();
+                        break;
+                    default:
+                        break;
                 }
             }
-            printf("\x1b[H\x1b[2J");
-            m_map.refresh();
         }
+        printf("\x1b[H\x1b[2J");
+        m_map.refresh();
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
     }
 }
 
