@@ -330,6 +330,49 @@ using namespace std;
             }
         }
 
+        void CServerMng::relay_game_frame(int port)
+        {
+            int res = 0;
+            int sockfd = 0;
+            sockfd = socket(AF_INET, SOCK_DGRAM, 0);
+            IF_EXIT(sockfd < 0, "socket");
+
+            TGameFrameUdp gameFrame;
+            std::vector<std::shared_ptr<CGame>> vecGames;
+            std::vector<int> vecCids;
+            std::shared_ptr<struct sockaddr_in> pUdpAddr;
+
+            while(1)
+            {
+                vecGames.clear();
+                vecCids.clear();
+                m_pGameServer->get_game_list(vecGames);
+                for(auto iter = vecGames.begin(); iter != vecGames.end(); ++iter)
+                {
+                    //如果游戏处于运行状态，那么广播该游戏的游戏帧
+                    if((*iter)->is_game_running())
+                    {
+                        (*iter)->get_game_frame(gameFrame);
+                        (*iter)->get_client_ids(vecCids);
+                        for(auto iter_2 = vecCids.begin();
+                                iter_2 != vecCids.end();
+                                ++iter_2)
+                            pUdpAddr = m_COnlinePlayers.get_client_udp_addr(*iter_2);
+                            if(pUdpAddr)
+                            {
+                                res = sendto(sockfd,
+                                            &gameFrame,
+                                            sizeof(gameFrame),
+                                            0,
+                                            (struct sockaddr*)(pUdpAddr.get()),
+                                            sizeof(struct sockaddr_in));
+                            }
+                    }
+                }
+                std::this_thread::sleep_for(std::chrono::milliseconds(10));
+            }
+        }
+
         void CServerMng::send_muticast()
         {
             int res = 0;
@@ -388,10 +431,35 @@ using namespace std;
                 std::cout << "res = " << res << endl;
                 std::this_thread::sleep_for(std::chrono::seconds(1));
             }
-
         }
 
-        
+        void CServerMng::send_udp()
+        {
+            int res = 0;
+            int sockfd = 0;
+            struct sockaddr_in serv_addr;
+            sockfd = socket(AF_INET, SOCK_DGRAM, 0);
+            IF_EXIT(sockfd < 0, "socket");
+
+            memset(&serv_addr, 0, sizeof(serv_addr));
+            serv_addr.sin_family = AF_INET;
+            serv_addr.sin_addr.s_addr = htonl(INADDR_ANY);
+            serv_addr.sin_port = htons(10000);
+
+            char msg[] = "udp message";
+            while(1)
+            {
+                res = sendto(sockfd,\
+                    msg,\
+                    sizeof(msg),\
+                    0,\
+                    (struct sockaddr*)(&serv_addr),\
+                    sizeof(serv_addr));
+
+                std::cout << "res = " << res << endl;
+                std::this_thread::sleep_for(std::chrono::seconds(1));
+            }
+        }
     #else
         #error "Unknown Apple platform"
     #endif
@@ -655,8 +723,21 @@ COnlinePlayers::~COnlinePlayers(){}
 
 void COnlinePlayers::add_player(SocketFd fd, ClientID cid)
 {
+    struct sockaddr_in client_addr;
+    socklen_t addr_len;
+    char ip[16] = { 0 };
+    getpeername(fd, (struct sockaddr*)&client_addr, &addr_len);
+    inet_ntop(AF_INET, &client_addr.sin_addr, ip, sizeof(ip));
+
+    memset(&client_addr, 0, sizeof(client_addr));
+    client_addr.sin_family = AF_INET;
+    client_addr.sin_addr.s_addr = inet_addr(ip);
+    client_addr.sin_port = htons(10010);
+
     std::lock_guard<std::mutex> lck(m_mtx);
     m_mapOlinePlayers.insert(std::make_pair(fd, cid));
+    m_mapOnlineUdpAddr.insert(std::make_pair(cid,
+        std::make_shared<struct sockaddr_in>(client_addr)));
 }
 
 int COnlinePlayers::remove_player_by_socketfd(SocketFd fd)
@@ -668,6 +749,12 @@ int COnlinePlayers::remove_player_by_socketfd(SocketFd fd)
     {
         nClientId = iter->second;
         m_mapOlinePlayers.erase(iter);
+    }
+
+    auto iter_2 = m_mapOnlineUdpAddr.find(nClientId);
+    if(iter_2 != m_mapOnlineUdpAddr.end())
+    {
+        m_mapOnlineUdpAddr.erase(iter_2);
     }
 
     return nClientId;
@@ -685,6 +772,12 @@ void COnlinePlayers::remove_player_by_clientid(ClientID id)
             m_mapOlinePlayers.erase(iter);
             return;
         }
+    }
+
+    auto iter = m_mapOnlineUdpAddr.find(id);
+    if(iter != m_mapOnlineUdpAddr.end())
+    {
+        m_mapOnlineUdpAddr.erase(iter);
     }
 }
 
@@ -718,6 +811,21 @@ int COnlinePlayers::get_sockfd(ClientID cid)
     }
 
     return -1;
+}
+
+std::shared_ptr<struct sockaddr_in> 
+    COnlinePlayers::get_client_udp_addr(ClientID cid)
+{
+    std::lock_guard<std::mutex> lck(m_mtx);
+    auto iter = m_mapOnlineUdpAddr.find(cid);
+    if(iter != m_mapOnlineUdpAddr.end())
+    {
+        return iter->second;
+    }
+    else
+    {
+        return std::shared_ptr<struct sockaddr_in>();
+    }
 }
 
 CServerMng::CServerMng()

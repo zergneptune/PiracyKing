@@ -46,6 +46,17 @@ struct TGameFrame
     int         optType[2];
 };
 
+struct TGameFrameUdp
+{
+    size_t      szFrameID;
+
+    uint64_t    nGameId;
+
+    int         nClientID[2];
+
+    int         optType[2];
+};
+
 struct TGameCmd
 {
     TGameCmd(){}
@@ -176,13 +187,14 @@ class CGame
         int  m_nReadyGame;
     };
 
+    typedef uint64_t G_GameID;
     typedef int G_ClientID; //客户端
     typedef int G_RoomOwner;//房主
     typedef std::map<G_ClientID, std::shared_ptr<CTaskQueue<int>>> G_GameOptMap;
     typedef std::map<G_ClientID, TPlayerStatus> G_PlayerStatusMap;
 
 public:
-    CGame(std::string strName);
+    CGame(G_GameID gameID, std::string strName);
     ~CGame();
 
     void start(int port);
@@ -217,10 +229,16 @@ public:
 
     void add_gameopt(G_ClientID client, GameOptType type);
 
+    void get_game_frame(TGameFrameUdp& temp_frame);
+
+    bool is_game_running(){ return m_bIsGameRunning; }
+
 private:
     void send_frame_thread_func(int port);
 
 private:
+
+    G_GameID                    m_gameID;
 
     std::string                 m_strRoomName;
 
@@ -234,7 +252,11 @@ private:
 
     bool                        m_bExitSendFrame;
 
+    bool                        m_bIsGameRunning;
+
     G_RoomOwner                 m_roomOwner;
+
+    size_t                      m_szGameFrameCnt;
 };
 
 class CGameServer
@@ -276,6 +298,8 @@ public:
 
     void get_cid_list(G_GameID id, std::vector<int>& vecCids);
 
+    void get_game_list(std::vector<std::shared_ptr<CGame>>& vecGames);
+
     int get_room_owner(G_GameID id);
 
     int get_player_nums(G_GameID id);
@@ -295,7 +319,7 @@ class CGameClient
 {
     typedef uint64_t G_GameID;
     typedef int G_ClientID;
-    typedef CTaskQueue<std::shared_ptr<TGameFrame>> GameFrameQue;
+    typedef CTaskQueue<std::shared_ptr<TGameFrameUdp>> GameFrameQue;
     typedef CTaskQueue<std::shared_ptr<TGameCmd>>   GameCmdQue;
     typedef std::map<G_ClientID, std::shared_ptr<CSnake>>   SnakeMap;
 public:
@@ -313,6 +337,8 @@ public:
     void clear_snake();
 
     void random_make_snake();
+
+    void add_game_frame(TGameFrameUdp* pGameFrame);
 
 private:
     void init();

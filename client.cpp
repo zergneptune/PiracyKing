@@ -352,6 +352,38 @@ using namespace std;
                 std::cout << "recvfrom : " << buffer << endl;
             }
         }
+
+        void CClientMng::recv_udp()
+        {
+            int res = 0;
+            int sockfd = 0;
+            struct sockaddr_in local_addr;
+            sockfd = socket(AF_INET, SOCK_DGRAM, 0);
+            IF_EXIT(sockfd < 0, "socket");
+
+            memset(&local_addr, 0, sizeof(local_addr));
+            local_addr.sin_family = AF_INET;
+            local_addr.sin_addr.s_addr = htonl(INADDR_ANY);
+            local_addr.sin_port = htons(10000);
+
+            res = ::bind(sockfd, (struct sockaddr *)&local_addr, sizeof(struct sockaddr));
+            IF_EXIT(res < 0, "bind");
+
+            char buffer[1024];
+            socklen_t srvaddr_len = sizeof(local_addr);
+            while(1)
+            {
+                memset(buffer, 0, 1024);
+                res = recvfrom(sockfd,\
+                    buffer,\
+                    1024,\
+                    0,\
+                    (struct sockaddr*)(&local_addr),\
+                    &srvaddr_len);
+
+                std::cout << "recvfrom : " << buffer << endl;
+            }
+        }
     #else
         #error "Unknown Apple platform"
     #endif
@@ -537,6 +569,39 @@ void CClientMng::task_proc_thread_func()
             default:
                 break;
         }
+    }
+}
+
+void CClientMng::recv_game_frame(int port)
+{
+    int res = 0;
+    int sockfd = 0;
+    struct sockaddr_in local_addr;
+    sockfd = socket(AF_INET, SOCK_DGRAM, 0);
+    IF_EXIT(sockfd < 0, "socket");
+
+    memset(&local_addr, 0, sizeof(local_addr));
+    local_addr.sin_family = AF_INET;
+    local_addr.sin_addr.s_addr = htonl(INADDR_ANY);
+    local_addr.sin_port = htons(port);
+
+    res = ::bind(sockfd, (struct sockaddr *)&local_addr, sizeof(struct sockaddr));
+    IF_EXIT(res < 0, "bind");
+
+    char buffer[sizeof(TGameFrameUdp)];
+    socklen_t srvaddr_len = sizeof(local_addr);
+    TGameFrameUdp* pGameFrame = NULL;
+    while(1)
+    {
+        res = recvfrom(sockfd,
+                        buffer,
+                        sizeof(TGameFrameUdp),
+                        0,
+                        (struct sockaddr*)(&local_addr),
+                        &srvaddr_len);
+        IF_EXIT(res < 0, "recvfrom");
+        pGameFrame = reinterpret_cast<TGameFrameUdp*>(buffer);
+        m_pGameClient->add_game_frame(pGameFrame);
     }
 }
 
@@ -1102,6 +1167,7 @@ int CClientMng::join_room(uint64_t gid)
             enter_any_key_to_continue();
         }
 
+        m_nCurrGameID = gid; //设置当前游戏id
         return nRet;
     }
     return -1;
@@ -1354,8 +1420,7 @@ void CClientMng::game_start(uint64_t gid)
     quit_game_ready(gid);
     quit_game(gid);
 
-    //移除客户端对应的蛇对象
-    m_pGameClient->remove_snake(m_nClientID);
+    //清除客户端对应的蛇对象
     m_pGameClient->clear_snake();
 }
 
@@ -1431,15 +1496,22 @@ int CClientMng::init_thread()
             this->task_proc_thread_func();
         });
 
+    thread recvGameFrameThread([this]()
+        {
+            this->recv_game_frame(10010);
+        });
+
     socketRecvThread.detach();
     socketSendThread.detach();
     taskProcThread.detach();
+    recvGameFrameThread.detach();
     return 0;
 }
 
 int main()
 {
-	string IP("192.168.1.188");
+	//string IP("192.168.1.188");
+    string IP("192.168.2.143");
 	int port = 10086;
 	//std::cout<< "请输入ip: ";
 	//cin>>IP;
@@ -1452,7 +1524,6 @@ int main()
     clientMng.init(IP, port);
 
     clientMng.start_menu();
-
 
 	return 0;
 }

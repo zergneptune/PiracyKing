@@ -11,6 +11,31 @@
 #include <chrono>
 #include <algorithm>
 
+#define CLOSE_ATTR  "\033[m"
+#define BLACK       "\033[30m"
+#define RED         "\033[31m"
+#define GREEN       "\033[32m"
+#define YELLOW      "\033[33m"
+#define BLUE        "\033[34m"
+#define PURPLE      "\033[35m"
+#define DEEP_GREEN  "\033[36m"
+#define WHITE       "\033[37m"
+
+//计算结构体成员偏移量
+#define OFFSET_OF(type, member) ((size_t)&(((type*)0)->member))
+
+/*
+** _INTSIZEOF(n)整个做的事情就是将n的长度化为int长度的整数倍。
+** 比如n为5，二进制就是101b，int长度为4，二进制为100b，那么n化为int长度的整数倍就应该为8。
+** ~(sizeof(int) – 1) )就应该为~（4-1）=~（00000011b）=11111100b，这样任何数& ~(sizeof(int) – 1) )后最后两位肯定为0，就肯定是4的整数倍了。
+*/
+#define INTSIZE_OF(n) ((sizeof(n) + sizeof(int) – 1) & ~(sizeof(int) – 1))
+
+/*
+** 已知结构体type的成员member的地址ptr，求解结构体type的起始地址。
+*/
+#define CONTAINER_OF(type, member, ptr) ((type*)((char*)ptr - OFFSET_OF(type, member)))
+
 struct TTaskData;
 struct TSocketFD;
 struct TEventResult;

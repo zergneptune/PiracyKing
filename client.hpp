@@ -53,6 +53,8 @@ public:
 
 	void recv_broadcast();
 
+	void recv_udp();
+
 private:
 	
     int connect_server(std::string ip, int port);
@@ -64,6 +66,8 @@ private:
 	void socket_send_thread_func();
 
 	void task_proc_thread_func();
+
+	void recv_game_frame(int port);
 
 private:
 
@@ -81,6 +85,8 @@ private:
     int             m_nServerSockfd;
 
     int 			m_nClientID;
+
+    uint64_t        m_nCurrGameID; //当前游戏id
     
 	SOCKETFD_QUE 	m_queSocketFD;
 

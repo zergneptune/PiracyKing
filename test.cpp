@@ -6,6 +6,7 @@
 #include <list>
 #include <algorithm>
 #include <stdio.h>
+#include <math.h>
 #include <termios.h>
 #include <fcntl.h>
 #include <sys/types.h>
@@ -13,6 +14,13 @@
 #include <unistd.h>
 #include "practice.hpp"
 #include "utility.hpp"
+/*-------  test ---------*/
+#define LUA_ROOT    "/usr/local/"
+#define LUA_LDIR    LUA_ROOT "share/lua/5.1/"
+#define LUA_CDIR    LUA_ROOT "lib/lua/5.1/"
+#define LUA_PATH_DEFAULT  \
+        "./?.lua;"  LUA_LDIR"?.lua;"  LUA_LDIR"?/init.lua;" \
+                    LUA_CDIR"?.lua;"  LUA_CDIR"?/init.lua"
 /*-----------------------*/
 #define HAS_MEMBER(member)\
 template<typename T, typename... Args>struct has_member_##member\
@@ -659,6 +667,196 @@ void thread_func(CSnowFlake* p)
     }
 }
 
+struct geordinate{
+    int x;
+    int y;
+};
+
+struct Geo{
+    float lon;
+    float lat;
+};
+
+void print_matrix()
+{
+    char buff[256] = { 0 };
+
+    //预定义10组二维坐标
+    Geo geo[10] = { 0 };
+    int idx = 0;
+    int len = 0;
+    float read_lon, read_lat = 0;
+
+    std::ifstream input_file("/Users/xiangyu/Desktop/意大利苍耳国内分布数据.txt");
+    if(input_file.is_open()){
+        input_file.seekg(0, input_file.end);
+        len = input_file.tellg();
+        printf("file length = %d\n", len);
+        input_file.seekg(0, input_file.beg);
+
+        input_file.ignore(32, '\n'); //忽略掉第一行数据
+        len = input_file.tellg();
+        printf("first line length = %d\n", len);
+        std::string temp;
+        while(std::getline(input_file, temp)){
+            printf("***** temp = %s\n", temp.c_str());
+            std::istringstream istr(temp);
+            istr >> read_lon >> read_lat;
+            geo[idx].lon = read_lon;
+            geo[idx].lat = read_lat;
+            ++idx;
+            memset(buff, 0, 256);
+        }
+
+        input_file.close();
+    }else{
+        printf("read error: %d\n", errno);
+        return;
+    }
+
+    for(int i = 0; i < 10; ++i){
+        printf("%d. {%f, %f}\n", i, geo[i].lon, geo[i].lat);
+    }
+
+    float distance[10][10] = { 0 };// distance[0][1]：表示第0组坐标与第一组坐标的距离
+
+    //计算距离
+    for(int i = 0; i < 10; ++i){
+        for(int j = 0; j < 10; ++j){
+            if(i != j){
+                distance[i][j] = sqrt((geo[i].lon - geo[j].lon) * (geo[i].lon - geo[j].lon) + (geo[i].lat - geo[j].lat) * (geo[i].lat - geo[j].lat));
+            }
+        }
+    }
+
+    printf("%-10s%-10s%-10s%-10s%-10s%-10s%-10s%-10s%-10s%-10s%-10s\n",
+        "pop ID", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10");
+    printf("==============================================================================================================\n");
+    for(int i = 0; i < 10; ++i){
+        printf("%-10d", i + 1);
+        for(int j = 0; j < 10; ++j){
+            if(i != j){
+                printf("%-10.4f", distance[i][j]);
+            }else{
+                printf("%-10s", "****");
+            }
+        }
+        printf("\n");
+    }
+    printf("==============================================================================================================\n");
+
+    //将结果输出到到txt文件
+    std::ofstream output_file("/Users/xiangyu/Desktop/意大利苍耳国内分布数据_统计结果矩阵.txt");
+    if(output_file.is_open())
+    {
+        sprintf(buff, "%-10s%-10s%-10s%-10s%-10s%-10s%-10s%-10s%-10s%-10s%-10s\r\n",
+            "pop ID", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10");
+        std::string line("==============================================================================================================");
+        output_file << std::string(buff) << "\r\n"; //写第一行
+        output_file << line << "\r\n";
+        for(int i = 0; i < 10; ++i){
+            sprintf(buff, "%-10d", i + 1);
+            output_file << std::string(buff);
+            for(int j = 0; j < 10; ++j){
+                if(i != j){
+                    sprintf(buff, "%-10.4f", distance[i][j]);
+                    output_file << std::string(buff);
+                }else{
+                    sprintf(buff, "%-10s", "****");
+                    output_file << std::string(buff);
+                }
+            }
+            output_file << "\r\n";
+        }
+        output_file << line;
+        output_file.close();
+    }
+}
+
+void picture_tagging()
+{
+    std::cout << "输入图片信息文件路径：";
+    std::string str_pic_info_path = get_input_string();
+    size_t sz_start_pos = str_pic_info_path.find_last_of("/\\");
+    std::string str_pic_tagging_res_path;
+    
+    if(sz_start_pos == std::string::npos)
+    {
+        std::cout << "error file name: " << str_pic_info_path << endl;
+        return; 
+    }
+
+    std::string str_pic_info_filename;
+    if(sz_start_pos != 0)
+    {
+        str_pic_info_filename = str_pic_info_path.substr(sz_start_pos + 1);
+    }
+    else
+    {
+        str_pic_info_filename = str_pic_info_path.substr(1);
+    }
+
+    size_t pos = str_pic_info_filename.rfind(".");
+    if(pos != std::string::npos)
+    {
+        str_pic_info_filename = str_pic_info_filename.substr(0, pos);
+    }
+    std::string str_pic_tagging_res_file_name = str_pic_info_filename + string("_tagging_reuslt.txt");
+    str_pic_tagging_res_path = str_pic_info_path.substr(0, sz_start_pos + 1) + str_pic_tagging_res_file_name;
+    printf("str_pic_info_filename = %s\n", str_pic_info_filename.c_str());
+    printf("str_pic_tagging_res_file_name = %s\n", str_pic_tagging_res_file_name.c_str());
+    
+    int n_pic_num = 0;
+    int n_pic_tag = 0;
+    int n_start_line_num = 0;
+    int n_readed_line_num = 0;
+    std::string str_line_info;
+    std::string str_pic_url, str_link, str_text, str_pic_text;
+    std::ifstream ifs;
+    std::ofstream ofs;
+
+    ifs.open(str_pic_info_path);
+    if(!ifs.is_open())
+    {
+        std::cout << "error open: " << str_pic_info_path << endl;
+        return;
+    }
+
+    ofs.open(str_pic_tagging_res_path, std::ofstream::out | std::ofstream::app);
+    if(!ofs.is_open())
+    {
+        std::cout << "error open: " << str_pic_tagging_res_path << endl;
+        return;
+    }
+
+    std::cout << "输入开始标注的图片序号：";
+    n_pic_num = get_input_number();
+    n_start_line_num = n_pic_num + 1;
+    for(int i = 1; i < n_start_line_num; ++i)
+    {
+        ifs.ignore(10240, '\n');
+    }
+
+    while(std::getline(ifs, str_line_info))
+    {
+        std::stringstream strs(str_line_info);
+        strs >> str_pic_url >> str_link >> str_text >> str_pic_text;
+        std::cout << "当前广告图片序号：" << PURPLE << "[ " << n_pic_num << " ]" << CLOSE_ATTR << endl;
+        std::cout << "\t广告图片链接地址：" << str_pic_url << endl;
+        std::cout << "\t广告落地页：" << str_link << endl;
+        std::cout << "\t广告文字：" << BLUE << str_text << CLOSE_ATTR << endl;
+        std::cout << "\t广告图片中文字：" << BLUE << str_pic_text << CLOSE_ATTR << endl;
+        std::cout << "\t输入图片标签：";
+        n_pic_tag = get_input_number();
+        ofs << n_pic_num << '\t' << n_pic_tag << "\r\n";
+        ofs.flush();
+        ++n_pic_num;
+    }
+
+    ifs.close();
+    ofs.close();
+}
+
 int main(int argc, char const *argv[])
 {
 	/*
@@ -681,10 +879,5 @@ int main(int argc, char const *argv[])
     game.init();
     game.start();*/
 
-    char text[] = "ABACHOIEHGAAABAABAAABAAASDEOAAABAA";
-    char pattern[] = "AAABAABAAABAAA";
-
-    int res = bm_search(text, strlen(text), pattern, strlen(pattern));
-    std::cout << "res = " << res << std::endl;
     return 0;
 }

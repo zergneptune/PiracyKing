@@ -48,6 +48,7 @@ class COnlinePlayers
 	typedef	int ClientID;
 	typedef int SocketFd;
 	typedef std::map<SocketFd, ClientID>	OnlinePlayersMap;
+	typedef std::map<ClientID, std::shared_ptr<struct sockaddr_in>> OnlinePlayerUdpAddr;
 
 public:
 	COnlinePlayers();
@@ -65,8 +66,12 @@ public:
 
 	int get_sockfd(ClientID cid);
 
+	std::shared_ptr<struct sockaddr_in> get_client_udp_addr(ClientID cid);
+
 private:
 	OnlinePlayersMap		m_mapOlinePlayers;
+
+	OnlinePlayerUdpAddr		m_mapOnlineUdpAddr;
 
 	std::mutex				m_mtx;
 };
@@ -108,10 +113,12 @@ public:
 
 	void do_game_cmd(std::shared_ptr<TTaskData>& pTask);
 
-private:
+public:
 	void send_muticast();
 
 	void send_broadcast();
+
+	void send_udp();
 
 private:
 	void init_thread();
@@ -123,6 +130,8 @@ private:
 	void task_proc_thread_func();
 
 	void listen_thread_func(int port);
+
+	void relay_game_frame(int port);
 
 private:
 	int 			m_nPort;
@@ -136,6 +145,8 @@ private:
 	CClientInfoMng	m_ClientInfoMng;
 
 	COnlinePlayers	m_COnlinePlayers;
+
+	std::vector<std::thread*> m_assembleThreadPool;
 
 private:
 	CGameServer*	m_pGameServer;

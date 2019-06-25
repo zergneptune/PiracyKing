@@ -307,7 +307,8 @@ void CSnake::vanish()
     }
 }
 
-CGame::CGame(std::string strName): m_strRoomName(strName), m_roomOwner(-1){}
+CGame::CGame(G_GameID gameID, std::string strName):
+    m_gameID(gameID), m_strRoomName(strName), m_roomOwner(-1), m_szGameFrameCnt(0), m_bIsGameRunning(false){}
 
 CGame::~CGame(){}
 
@@ -322,11 +323,14 @@ void CGame::start(int port)
             this->send_frame_thread_func(port);
         });
 	send_frame_thread.detach();
+
+    m_bIsGameRunning = true;
 }
 
 void CGame::over()
 {
 	m_bExitSendFrame = true;
+    m_bIsGameRunning = false;
 }
 
 bool CGame::add_client(G_ClientID client)
@@ -445,6 +449,32 @@ void CGame::add_gameopt(G_ClientID client, GameOptType type)
 	{
 		iter->second->AddTask(static_cast<int>(type));
 	}
+}
+
+void CGame::get_game_frame(TGameFrameUdp& temp_frame)
+{
+    size_t frame_cnt = 0;
+    int i = 0;
+    int opttype = 0;
+    std::lock_guard<std::mutex> lock(m_mtx);
+    for(auto iter = m_mapGameOpt.begin(); iter != m_mapGameOpt.end(); ++ iter)
+    {
+        if(iter->second->Try_GetTask(opttype) == false)
+        {
+            opttype = GameOptType::MOVE_FORWARD;
+        }
+        else
+        {
+            printf("debug: cid = %d, opttype = %d, frame_cnt = %zu\r\n", iter->first, opttype, frame_cnt);
+        }
+
+        temp_frame.nClientID[i] = iter->first;
+        temp_frame.optType[i] = opttype;
+        ++i;
+    }
+
+    temp_frame.szFrameID = ++m_szGameFrameCnt;
+    temp_frame.nGameId = m_gameID;
 }
 
 int CGame::get_client_nums()
@@ -571,6 +601,7 @@ uint64_t CGameServer::create_game(int cid, std::string& strGameName)
 
     auto res_pair = m_mapGame.insert(
     std::make_pair(nNewGameId, std::make_shared<CGame>(
+                                            nNewGameId,
                                             strGameName)));
     if(res_pair.second)
     {
@@ -794,6 +825,15 @@ void CGameServer::get_cid_list(G_GameID id, std::vector<int>& vecCids)
     }
 }
 
+void CGameServer::get_game_list(std::vector<std::shared_ptr<CGame>>& vecGames)
+{
+    std::lock_guard<std::mutex> lck(m_mtx);
+    for(auto iter = m_mapGame.begin(); iter != m_mapGame.end(); ++iter)
+    {
+        vecGames.push_back(iter->second);
+    }
+}
+
 int CGameServer::get_room_owner(G_GameID id)
 {
     std::lock_guard<std::mutex> lck(m_mtx);
@@ -827,6 +867,8 @@ void CGameClient::init()
     std::cout << "random seed = " << m_nRandSeed << std::endl;
 	m_map.init();
     srand(m_nRandSeed);//设置随机种子
+    m_QueGameCmd.clear();
+    m_queGameFrame.clear();
     random_make_snake();
     m_map.random_make_food();
 }
@@ -860,14 +902,14 @@ bool CGameClient::is_valid_move(int cid, GameOptType opttype)
 void CGameClient::play(G_GameID gid, int cid, int port)
 {
     init();//初始化
-    m_bExitRecvFrame = false;
+    //m_bExitRecvFrame = false;
     m_bExitRefresh = false;
 
-    std::thread recv_frame_thread([this, port]()
+    /*std::thread recv_frame_thread([this, port]()
         {
             this->recv_frame_thread_func(port);
         });
-    recv_frame_thread.detach();
+    recv_frame_thread.detach();*/
 
     std::thread refresh_thread([this]()
         {
@@ -971,7 +1013,7 @@ void CGameClient::play(G_GameID gid, int cid, int port)
     SHOW_CURSOR();
 
     //退出线程
-    m_bExitRecvFrame = true;
+    //m_bExitRecvFrame = true;
     m_bExitRefresh = true;
     std::this_thread::sleep_for(std::chrono::seconds(1));
 }
@@ -1058,6 +1100,15 @@ void CGameClient::random_make_snake()
     }
 }
 
+void CGameClient::add_game_frame(TGameFrameUdp* pGameFrame)
+{
+    if(pGameFrame)
+    {
+        m_queGameFrame.AddTask(
+            std::make_shared<TGameFrameUdp>(*pGameFrame));
+    }
+}
+
 void CGameClient::recv_frame_thread_func(int port)
 {
 	int res = 0;
@@ -1108,7 +1159,7 @@ void CGameClient::recv_frame_thread_func(int port)
 
         //printf("recv res = %d\r\n", res);
         pframe = reinterpret_cast<TGameFrame*>(buffer);
-        m_queGameFrame.AddTask(std::make_shared<TGameFrame>(*pframe));
+        //m_queGameFrame.AddTask(std::make_shared<TGameFrame>(*pframe));
     }
 
     //退出多播组
@@ -1125,43 +1176,46 @@ void CGameClient::recv_frame_thread_func(int port)
 
 void CGameClient::refresh_thread_func()
 {
+    G_ClientID cid;
     int opttype;
-    int i = 0;
     while(!m_bExitRefresh)
     {
-        std::shared_ptr<TGameFrame> pframe = m_queGameFrame.Wait_GetTask();
-        i = 0;
-        for(auto iter = m_mapSnake.begin(); iter != m_mapSnake.end(); ++ iter)
+        std::shared_ptr<TGameFrameUdp> pframe = m_queGameFrame.Wait_GetTask();
+        if(m_queGameFrame.Try_GetTask(pframe))
         {
-            opttype = pframe->optType[i++];
-            switch(opttype)
+            for(int i = 0; i < m_mapSnake.size(); ++i)
             {
-                case GameOptType::MOVE_FORWARD:
-                    iter->second->move_forward();
-                    break;
-                case GameOptType::MOVE_UP:
-                    iter->second->move_up();
-                    break;
-                case GameOptType::MOVE_DOWN:
-                    iter->second->move_down();
-                    break;
-                case GameOptType::MOVE_LEFT:
-                    iter->second->move_left();
-                    break;
-                case GameOptType::MOVE_RIGHT:
-                    iter->second->move_right();
-                    break;
-                default:
-                    break;
+                cid = pframe->nClientID[i];
+                opttype = pframe->optType[i];
+                auto iter = m_mapSnake.find(cid);
+                if(iter != m_mapSnake.end())
+                {
+                    switch(opttype)
+                    {
+                        case GameOptType::MOVE_FORWARD:
+                            iter->second->move_forward();
+                            break;
+                        case GameOptType::MOVE_UP:
+                            iter->second->move_up();
+                            break;
+                        case GameOptType::MOVE_DOWN:
+                            iter->second->move_down();
+                            break;
+                        case GameOptType::MOVE_LEFT:
+                            iter->second->move_left();
+                            break;
+                        case GameOptType::MOVE_RIGHT:
+                            iter->second->move_right();
+                            break;
+                        default:
+                            break;
+                    }
+                }
             }
+            printf("\x1b[H\x1b[2J");
+            m_map.refresh();
         }
-        printf("\x1b[H\x1b[2J");
-        m_map.refresh();
-        //std::this_thread::sleep_for(std::chrono::milliseconds(500));
     }
-
-    //清除本局游戏数据
-    m_queGameFrame.clear();
 }
 
 
