@@ -330,7 +330,7 @@ using namespace std;
             }
         }
 
-        void CServerMng::relay_game_frame(int port)
+        void CServerMng::relay_game_frame()
         {
             int res = 0;
             int sockfd = 0;
@@ -904,9 +904,15 @@ void CServerMng::init_thread()
             this->task_proc_thread_func();
         });
 
+    std::thread relayGameFrameThread([this]()
+        {
+            this->relay_game_frame();
+        });
+
     socketRecvThread.detach();
     socketSendThread.detach();
     taskProcThread.detach();
+    relayGameFrameThread.detach();
 }
 
 void CServerMng::task_proc_thread_func()

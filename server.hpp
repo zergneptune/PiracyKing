@@ -131,7 +131,7 @@ private:
 
 	void listen_thread_func(int port);
 
-	void relay_game_frame(int port);
+	void relay_game_frame();
 
 private:
 	int 			m_nPort;
