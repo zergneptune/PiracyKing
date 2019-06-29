@@ -2,6 +2,7 @@
 #include <iostream>
 #include <sys/socket.h>
 #include <unistd.h>
+#include <dirent.h>
 #include <fcntl.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -245,4 +246,37 @@ std::string get_input_string()
     }
 
     return strInput;
+}
+
+int recurse_dir(char *basePath)
+{
+    DIR *dir;
+    struct dirent *ptr;
+    char base[1000];
+
+    if((dir = opendir(basePath)) == NULL)
+    {
+        perror("Open dir error...");
+        exit(1);
+    }
+
+    while((ptr = readdir(dir)) != NULL)
+    {
+        if(strcmp(ptr->d_name, ".") == 0 || strcmp(ptr->d_name, "..")==0)
+            continue;
+        else if(ptr->d_type == 8)    ///file
+            printf("d_name:%s/%s\n", basePath, ptr->d_name);
+        else if(ptr->d_type == 10)    ///link file
+            printf("d_name:%s/%s\n", basePath, ptr->d_name);
+        else if(ptr->d_type == 4)    ///dir
+        {
+            memset(base, '\0', sizeof(base));
+            strcpy(base, basePath);
+            strcat(base, "/");
+            strcat(base, ptr->d_name);
+            recurse_dir(base);
+        }
+    }
+    closedir(dir);
+    return 1;
 }

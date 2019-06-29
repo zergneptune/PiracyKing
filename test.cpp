@@ -12,6 +12,7 @@
 #include <sys/types.h>
 #include <sys/uio.h>
 #include <unistd.h>
+#include <dirent.h>
 #include "practice.hpp"
 #include "utility.hpp"
 /*-------  test ---------*/
@@ -773,8 +774,45 @@ void print_matrix()
     }
 }
 
+int readFileList(const char *basePath, std::vector<std::string>& vec_img_name)
+{
+    DIR *dir;
+    struct dirent *ptr;
+    char base[1000];
+
+    if((dir = opendir(basePath)) == NULL)
+    {
+        perror("Open dir error...");
+        exit(1);
+    }
+
+    while((ptr = readdir(dir)) != NULL)
+    {
+        if(strcmp(ptr->d_name, ".") == 0 || strcmp(ptr->d_name, "..")==0)
+            continue;
+        else if(ptr->d_type == 8)    ///file
+        {
+            vec_img_name.push_back(string(ptr->d_name));
+        }
+        else if(ptr->d_type == 10)    ///link file
+            printf("d_name: %s/%s\n", basePath, ptr->d_name);
+        else if(ptr->d_type == 4)    ///dir
+        {
+            memset(base, '\0', sizeof(base));
+            strcpy(base, basePath);
+            strcat(base, "/");
+            strcat(base, ptr->d_name);
+            readFileList(base, vec_img_name);
+        }
+    }
+    closedir(dir);
+    return 1;
+}
+
 void picture_tagging()
 {
+    std:cout << "输入图片文件路径：";
+    std::string str_pic_path = get_input_string();
     std::cout << "输入图片信息文件路径：";
     std::string str_pic_info_path = get_input_string();
     size_t sz_start_pos = str_pic_info_path.find_last_of("/\\");
@@ -829,6 +867,10 @@ void picture_tagging()
         return;
     }
 
+    std::vector<std::string> vec_img_name;
+    readFileList(str_pic_path.c_str(), vec_img_name);
+    std::sort(vec_img_name.begin(), vec_img_name.end(), std::less<std::string>());
+
     std::cout << "输入开始标注的图片序号：";
     n_pic_num = get_input_number();
     n_start_line_num = n_pic_num + 1;
@@ -837,20 +879,34 @@ void picture_tagging()
         ifs.ignore(10240, '\n');
     }
 
-    while(std::getline(ifs, str_line_info))
+    char buf[32] = { 0 };
+    sprintf(buf, "%d.jpg", n_pic_num);
+    std::string start_pic_name(buf);
+    for(auto& img_name : vec_img_name)
     {
-        std::stringstream strs(str_line_info);
-        strs >> str_pic_url >> str_link >> str_text >> str_pic_text;
-        std::cout << "当前广告图片序号：" << PURPLE << "[ " << n_pic_num << " ]" << CLOSE_ATTR << endl;
-        std::cout << "\t广告图片链接地址：" << str_pic_url << endl;
-        std::cout << "\t广告落地页：" << str_link << endl;
-        std::cout << "\t广告文字：" << BLUE << str_text << CLOSE_ATTR << endl;
-        std::cout << "\t广告图片中文字：" << BLUE << str_pic_text << CLOSE_ATTR << endl;
-        std::cout << "\t输入图片标签：";
-        n_pic_tag = get_input_number();
-        ofs << n_pic_num << '\t' << n_pic_tag << "\r\n";
-        ofs.flush();
-        ++n_pic_num;
+        if(img_name >= start_pic_name)
+        {
+            std::string tmp = img_name.substr(0, img_name.find(".") + 1);
+            int img_num = atoi(tmp.c_str());
+            ifs.seekg(std::ifstream::beg);
+            n_start_line_num = img_num + 1;
+            for(int i = 1; i < n_start_line_num; ++i)
+            {
+                ifs.ignore(10240, '\n');
+            }
+            std::getline(ifs, str_line_info);
+            std::stringstream strs(str_line_info);
+            strs >> str_pic_url >> str_link >> str_text >> str_pic_text;
+            std::cout << "当前标注的图片：" << PURPLE << "[ " << img_name << " ]" << CLOSE_ATTR << endl;
+            std::cout << "\t广告图片链接地址：" << str_pic_url << endl;
+            std::cout << "\t广告落地页：" << str_link << endl;
+            std::cout << "\t广告文字：" << BLUE << str_text << CLOSE_ATTR << endl;
+            std::cout << "\t广告图片中文字：" << BLUE << str_pic_text << CLOSE_ATTR << endl;
+            std::cout << "\t输入图片标签：";
+            n_pic_tag = get_input_number();
+            ofs << img_num << '\t' << n_pic_tag << "\r\n";
+            ofs.flush();
+        }
     }
 
     ifs.close();
@@ -878,6 +934,7 @@ int main(int argc, char const *argv[])
     /*CGame game;
     game.init();
     game.start();*/
-
+    //readFileList("/Users/xiangyu/Desktop/文档/图片标注/data1");
+    picture_tagging();
     return 0;
 }

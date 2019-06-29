@@ -313,6 +313,12 @@ int get_input_number();
 
 std::string get_input_string();
 
+/*
+** 文件io
+*/
+//遍历文件夹
+int recurse_dir(char *basePath);
+
 
 
 
