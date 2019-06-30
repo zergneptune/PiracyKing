@@ -1211,7 +1211,7 @@ void CGameClient::refresh_thread_func()
             }
         }
         printf("\x1b[H\x1b[2J");
-        m_map.refresh();
+        //m_map.refresh();
     }
 }
 
