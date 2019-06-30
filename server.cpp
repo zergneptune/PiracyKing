@@ -367,12 +367,12 @@ using namespace std;
                                             0,
                                             (struct sockaddr*)(pUdpAddr.get()),
                                             sizeof(struct sockaddr_in));
-                                printf("debug: sendto: szFrameID = %lu, gameid = %lu, cid_1 = %d, opt_1 = %d, cid_2 = %d, opt_2 = %d\n",
-                                        gameFrame.szFrameID,
-                                        gameFrame.nGameId,
-                                        gameFrame.nClientID[0],
-                                        gameFrame.optType[0],
-                                        gameFrame.nClientID[1],
+                                //printf("debug: sendto: szFrameID = %lu, gameid = %lu, cid_1 = %d, opt_1 = %d, cid_2 = %d, opt_2 = %d\n",\
+                                        gameFrame.szFrameID,\
+                                        gameFrame.nGameId,\
+                                        gameFrame.nClientID[0],\
+                                        gameFrame.optType[0],\
+                                        gameFrame.nClientID[1],\
                                         gameFrame.optType[1]);
                             }
                         }

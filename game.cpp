@@ -461,6 +461,7 @@ void CGame::get_game_frame(TGameFrameUdp& temp_frame)
         if(iter->second->Try_GetTask(opttype) == false)
         {
             opttype = GameOptType::MOVE_FORWARD;
+            printf("debug: 默认移动命令\n");
         }
         else
         {
