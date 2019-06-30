@@ -150,8 +150,7 @@ void CSnake::move_up()
     int x1 = iter->m_cox;
     ++ iter;
     int x2 = iter->m_cox;
-    //if(x1 > x2) //如果蛇正在向下移动，那么禁止向上移动
-    if(x1 != x2)
+    if(x1 > x2) //如果蛇正在向下移动，那么禁止向上移动
     {
         return;
     }
@@ -165,8 +164,7 @@ void CSnake::move_down()
     int x1 = iter->m_cox;
     ++ iter;
     int x2 = iter->m_cox;
-    //if(x1 < x2) //如果蛇正在向上移动，那么禁止向下移动
-    if(x1 != x2)
+    if(x1 < x2) //如果蛇正在向上移动，那么禁止向下移动
     {
         return;
     }
@@ -180,8 +178,7 @@ void CSnake::move_left()
     int y1 = iter->m_coy;
     ++ iter;
     int y2 = iter->m_coy;
-    //if(y1 > y2) //如果蛇正在向右移动，那么禁止向左移动
-    if(y1 != y2)
+    if(y1 > y2) //如果蛇正在向右移动，那么禁止向左移动
     {
         return;
     }
@@ -195,8 +192,7 @@ void CSnake::move_right()
     int y1 = iter->m_coy;
     ++ iter;
     int y2 = iter->m_coy;
-    //if(y1 < y2) //如果蛇正在向左移动，那么禁止向右移动
-    if(y1 != y2)
+    if(y1 < y2) //如果蛇正在向左移动，那么禁止向右移动
     {
         return;
     }
