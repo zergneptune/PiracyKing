@@ -443,8 +443,8 @@ void CGame::add_gameopt(G_ClientID client, GameOptType type)
 	auto iter = m_mapGameOpt.find(client);
 	if(iter != m_mapGameOpt.end())
 	{
-        printf("debug: 添加游戏操作 cid = %d, type = %d, 队列大小 = %d\n", client, type, iter->second->size());
 		iter->second->AddTask(static_cast<int>(type));
+        printf("debug: 添加游戏操作 cid = %d, type = %d, 队列大小 = %d\n", client, type, iter->second->size());
 	}
 }
 
@@ -458,7 +458,7 @@ void CGame::get_game_frame(TGameFrameUdp& temp_frame)
         if(iter->second->Try_GetTask(opttype) == false)
         {
             opttype = GameOptType::MOVE_FORWARD;
-            printf("debug: 默认移动命令\n");
+            printf("debug: 默认移动命令, 队列大小 = %d\n", iter->second->size());
         }
         else
         {
