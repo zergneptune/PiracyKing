@@ -150,7 +150,8 @@ void CSnake::move_up()
     int x1 = iter->m_cox;
     ++ iter;
     int x2 = iter->m_cox;
-    if(x1 > x2) //如果蛇正在向下移动，那么禁止向上移动
+    //if(x1 > x2) //如果蛇正在向下移动，那么禁止向上移动
+    if(x1 != x2)
     {
         return;
     }
@@ -164,7 +165,8 @@ void CSnake::move_down()
     int x1 = iter->m_cox;
     ++ iter;
     int x2 = iter->m_cox;
-    if(x1 < x2) //如果蛇正在向上移动，那么禁止向下移动
+    //if(x1 < x2) //如果蛇正在向上移动，那么禁止向下移动
+    if(x1 != x2)
     {
         return;
     }
@@ -178,7 +180,8 @@ void CSnake::move_left()
     int y1 = iter->m_coy;
     ++ iter;
     int y2 = iter->m_coy;
-    if(y1 > y2) //如果蛇正在向右移动，那么禁止向左移动
+    //if(y1 > y2) //如果蛇正在向右移动，那么禁止向左移动
+    if(y1 != y2)
     {
         return;
     }
@@ -192,7 +195,8 @@ void CSnake::move_right()
     int y1 = iter->m_coy;
     ++ iter;
     int y2 = iter->m_coy;
-    if(y1 < y2) //如果蛇正在向左移动，那么禁止向右移动
+    //if(y1 < y2) //如果蛇正在向左移动，那么禁止向右移动
+    if(y1 != y2)
     {
         return;
     }
@@ -314,11 +318,11 @@ void CGame::start(int port)
     //m_cv.wait(lck, [this](){ return is_all_ready_recv(); })
     std::this_thread::sleep_for(std::chrono::seconds(5));
 	m_bExitSendFrame = false;
-	std::thread send_frame_thread([this, &port]()
-        {
-            this->send_frame_thread_func(port);
-        });
-	send_frame_thread.detach();
+	//std::thread send_frame_thread([this, &port]()
+    //    {
+    //        this->send_frame_thread_func(port);
+    //    });
+	//send_frame_thread.detach();
 
     m_bIsGameRunning = true;
 }
@@ -444,7 +448,6 @@ void CGame::add_gameopt(G_ClientID client, GameOptType type)
 	if(iter != m_mapGameOpt.end())
 	{
 		iter->second->AddTask(static_cast<int>(type));
-        printf("debug: 添加游戏操作 cid = %d, type = %d, 队列大小 = %d\n", client, type, iter->second->size());
 	}
 }
 
@@ -458,11 +461,10 @@ void CGame::get_game_frame(TGameFrameUdp& temp_frame)
         if(iter->second->Try_GetTask(opttype) == false)
         {
             opttype = GameOptType::MOVE_FORWARD;
-            printf("debug: 默认移动命令, 队列大小 = %d\n", iter->second->size());
         }
         else
         {
-            printf("debug: cid = %d, opttype = %d, frame_cnt = %zu, 队列大小 = %d\n", iter->first, opttype, m_szGameFrameCnt, iter->second->size());
+            printf("debug: cid = %d, opttype = %d, frame_cnt = %zu\n", iter->first, opttype, m_szGameFrameCnt);
         }
 
         temp_frame.nClientID[i] = iter->first;
@@ -979,15 +981,14 @@ void CGameClient::play(G_GameID gid, int cid, int port)
                     break;
             }
 
-            //if(is_valid_move(cid, opttype))
-            //{
-                printf("debug: 玩家操作 opttype = %d\n", opttype);
+            if(is_valid_move(cid, opttype))
+            {
                 m_pTaskData->AddTask(std::make_shared<TTaskData>(
                     MsgType::GAME_PLAYER_CMD,
                     gid,
                     cid,
                     static_cast<int>(opttype)));
-            //}
+            }
         }
 
         //确保两次连续的按下ESC键，才退出
@@ -1179,7 +1180,6 @@ void CGameClient::refresh_thread_func()
         {
             cid = pframe->nClientID[i];
             opttype = pframe->optType[i];
-            printf("debug: cid = %d, recv opttype = %d\n", cid, opttype);
             auto iter = m_mapSnake.find(cid);
             if(iter != m_mapSnake.end())
             {

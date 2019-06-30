@@ -122,11 +122,9 @@ using namespace std;
                         RegisterEvent(kq, sockfd, EVFILT_READ, EV_ADD | EV_DISABLE);
                         //enable写事件，准备回复客户端
                         RegisterEvent(kq, sockfd, EVFILT_WRITE, EV_ADD | EV_ENABLE);
-                        cout << "debug 1" << endl;
                     }
                     else if(event.filter == EVFILT_WRITE)
                     {
-                        cout << "debug 2" << endl;
                         write(sockfd, line, strlen(line));
                         //disable写事件，防止一直写
                         RegisterEvent(kq, sockfd, EVFILT_WRITE, EV_ADD | EV_DISABLE);
@@ -367,13 +365,6 @@ using namespace std;
                                             0,
                                             (struct sockaddr*)(pUdpAddr.get()),
                                             sizeof(struct sockaddr_in));
-                                //printf("debug: sendto: szFrameID = %lu, gameid = %lu, cid_1 = %d, opt_1 = %d, cid_2 = %d, opt_2 = %d\n",\
-                                        gameFrame.szFrameID,\
-                                        gameFrame.nGameId,\
-                                        gameFrame.nClientID[0],\
-                                        gameFrame.optType[0],\
-                                        gameFrame.nClientID[1],\
-                                        gameFrame.optType[1]);
                             }
                         }
                     }
@@ -1472,7 +1463,6 @@ void CServerMng::do_game_cmd(std::shared_ptr<TTaskData>& pTask)
         uint64_t gid = root["gid"].asUInt64();
         int cid = root["cid"].asInt();
         int cmd = root["cmd"].asInt();
-        printf("debug: 添加客户端游戏操作opttype = %d\n", cmd);
         m_pGameServer->add_game_player_opt(gid, cid, static_cast<GameOptType>(cmd));
     }
 }
