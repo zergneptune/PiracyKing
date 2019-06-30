@@ -983,15 +983,15 @@ void CGameClient::play(G_GameID gid, int cid, int port)
                     break;
             }
 
-            if(is_valid_move(cid, opttype))
-            {
+            //if(is_valid_move(cid, opttype))
+            //{
                 printf("debug: 玩家操作 opttype = %d\n", opttype);
                 m_pTaskData->AddTask(std::make_shared<TTaskData>(
                     MsgType::GAME_PLAYER_CMD,
                     gid,
                     cid,
                     static_cast<int>(opttype)));
-            }
+            //}
         }
 
         //确保两次连续的按下ESC键，才退出
