@@ -1472,6 +1472,7 @@ void CServerMng::do_game_cmd(std::shared_ptr<TTaskData>& pTask)
         uint64_t gid = root["gid"].asUInt64();
         int cid = root["cid"].asInt();
         int cmd = root["cmd"].asInt();
+        printf("debug: 添加客户端游戏操作opttype = %d\n", cmd);
         m_pGameServer->add_game_player_opt(gid, cid, static_cast<GameOptType>(cmd));
     }
 }

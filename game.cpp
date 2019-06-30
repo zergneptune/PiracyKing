@@ -447,6 +447,7 @@ void CGame::add_gameopt(G_ClientID client, GameOptType type)
 	auto iter = m_mapGameOpt.find(client);
 	if(iter != m_mapGameOpt.end())
 	{
+        printf("debug: 添加游戏操作 cid = %d, type = %d\n", client, type);
 		iter->second->AddTask(static_cast<int>(type));
 	}
 }
