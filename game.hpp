@@ -234,7 +234,7 @@ public:
     bool is_game_running(){ return m_bIsGameRunning; }
 
 private:
-    void send_frame_thread_func(int port);
+    //void send_frame_thread_func(int port);
 
 private:
 
@@ -345,7 +345,7 @@ private:
 
     bool is_valid_move(int cid, GameOptType opttype);
 
-    void recv_frame_thread_func(int port);
+    //void recv_frame_thread_func(int port);
 
     void refresh_thread_func();
 

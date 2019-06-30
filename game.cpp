@@ -521,6 +521,7 @@ int CGame::set_room_owner(G_ClientID cid)
     return -1;
 }
 
+#if 0
 void CGame::send_frame_thread_func(int port)
 {
 	int res = 0;
@@ -567,6 +568,7 @@ void CGame::send_frame_thread_func(int port)
     //关闭套接字
     close(sockfd);
 }
+#endif
 
 CGameServer::CGameServer(): m_cSnowFlake(0){}
 
@@ -1104,6 +1106,7 @@ void CGameClient::add_game_frame(TGameFrameUdp* pGameFrame)
     }
 }
 
+#if 0
 void CGameClient::recv_frame_thread_func(int port)
 {
 	int res = 0;
@@ -1168,6 +1171,7 @@ void CGameClient::recv_frame_thread_func(int port)
     close(sockfd);
     IF_EXIT(res < 0, "setsockopt");
 }
+#endif
 
 void CGameClient::refresh_thread_func()
 {

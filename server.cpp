@@ -728,7 +728,7 @@ void COnlinePlayers::add_player(SocketFd fd, ClientID cid)
     char ip[16] = { 0 };
     getpeername(fd, (struct sockaddr*)&client_addr, &addr_len);
     inet_ntop(AF_INET, &client_addr.sin_addr, ip, sizeof(ip));
-    //printf("debug: client ip = %s\n", ip);
+    printf("debug: client ip = %s\n", ip);
 
     memset(&client_addr, 0, sizeof(client_addr));
     client_addr.sin_family = AF_INET;
