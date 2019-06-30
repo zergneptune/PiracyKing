@@ -984,6 +984,7 @@ void CGameClient::play(G_GameID gid, int cid, int port)
 
             if(is_valid_move(cid, opttype))
             {
+                printf("debug: 玩家操作 opttype = %d\n", opttype);
                 m_pTaskData->AddTask(std::make_shared<TTaskData>(
                     MsgType::GAME_PLAYER_CMD,
                     gid,
