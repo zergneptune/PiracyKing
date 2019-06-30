@@ -547,10 +547,6 @@ void CGame::send_frame_thread_func(int port)
     		{
     			opttype = GameOptType::MOVE_FORWARD;
     		}
-            else
-            {
-                printf("debug: cid = %d, opttype = %d, frame_cnt = %zu\r\n", iter->first, opttype, frame_cnt);
-            }
 
     		temp_frame.optType[i++] = opttype;
     	}
@@ -1184,7 +1180,7 @@ void CGameClient::refresh_thread_func()
         {
             cid = pframe->nClientID[i];
             opttype = pframe->optType[i];
-            printf("debug: recv opttype = %d\n", opttype);
+            printf("debug: cid = %d, recv opttype = %d\n", cid, opttype);
             auto iter = m_mapSnake.find(cid);
             if(iter != m_mapSnake.end())
             {
@@ -1210,7 +1206,7 @@ void CGameClient::refresh_thread_func()
                 }
             }
         }
-        printf("\x1b[H\x1b[2J");
+        //printf("\x1b[H\x1b[2J");
         //m_map.refresh();
     }
 }

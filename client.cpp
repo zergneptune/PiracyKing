@@ -601,6 +601,13 @@ void CClientMng::recv_game_frame(int port)
                         &srvaddr_len);
         IF_EXIT(res < 0, "recvfrom");
         pGameFrame = reinterpret_cast<TGameFrameUdp*>(buffer);
+        printf("debug: recvfrom: szFrameID = %lu, gameid = %lu, cid_1 = %d, opt_1 = %d, cid_2 = %d, opt_2 = %d\n",
+                                        pGameFrame->szFrameID,
+                                        pGameFrame->nGameId,
+                                        pGameFrame->nClientID[0],
+                                        pGameFrame->optType[0],
+                                        pGameFrame->nClientID[1],
+                                        pGameFrame->optType[1]);
         m_pGameClient->add_game_frame(pGameFrame);
     }
 }

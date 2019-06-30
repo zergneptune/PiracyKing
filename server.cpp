@@ -367,6 +367,13 @@ using namespace std;
                                             0,
                                             (struct sockaddr*)(pUdpAddr.get()),
                                             sizeof(struct sockaddr_in));
+                                printf("debug: sendto: szFrameID = %lu, gameid = %lu, cid_1 = %d, opt_1 = %d, cid_2 = %d, opt_2 = %d\n",
+                                        gameFrame.szFrameID,
+                                        gameFrame.nGameId,
+                                        gameFrame.nClientID[0],
+                                        gameFrame.optType[0],
+                                        gameFrame.nClientID[1],
+                                        gameFrame.optType[1]);
                             }
                         }
                     }
@@ -1465,7 +1472,6 @@ void CServerMng::do_game_cmd(std::shared_ptr<TTaskData>& pTask)
         uint64_t gid = root["gid"].asUInt64();
         int cid = root["cid"].asInt();
         int cmd = root["cmd"].asInt();
-        printf("gid = %llu, cid = %d, cmd = %d\r\n", gid, cid, cmd);
         m_pGameServer->add_game_player_opt(gid, cid, static_cast<GameOptType>(cmd));
     }
 }
