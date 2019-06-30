@@ -175,6 +175,8 @@ public:
 
 	void clear();
 
+	int size();
+
 private:
 	std::queue<T> m_qTask;
 	std::mutex m_mtx;
@@ -227,6 +229,13 @@ void CTaskQueue<T>::clear()
 	{
 		m_qTask.pop();
 	}
+}
+
+template<typename T>
+int CTaskQueue<T>::size()
+{
+	std::lock_guard<std::mutex> lck(m_mtx);
+	return m_qTask.size();
 }
 
 struct TTaskData

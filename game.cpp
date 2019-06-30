@@ -443,7 +443,7 @@ void CGame::add_gameopt(G_ClientID client, GameOptType type)
 	auto iter = m_mapGameOpt.find(client);
 	if(iter != m_mapGameOpt.end())
 	{
-        printf("debug: 添加游戏操作 cid = %d, type = %d\n", client, type);
+        printf("debug: 添加游戏操作 cid = %d, type = %d, 队列大小 = %d\n", client, type, iter->second->size());
 		iter->second->AddTask(static_cast<int>(type));
 	}
 }
@@ -462,7 +462,7 @@ void CGame::get_game_frame(TGameFrameUdp& temp_frame)
         }
         else
         {
-            printf("debug: cid = %d, opttype = %d, frame_cnt = %zu\r\n", iter->first, opttype, m_szGameFrameCnt);
+            printf("debug: cid = %d, opttype = %d, frame_cnt = %zu, 队列大小 = %d\n", iter->first, opttype, m_szGameFrameCnt, iter->second->size());
         }
 
         temp_frame.nClientID[i] = iter->first;
@@ -1205,8 +1205,8 @@ void CGameClient::refresh_thread_func()
                 }
             }
         }
-        //printf("\x1b[H\x1b[2J");
-        //m_map.refresh();
+        printf("\x1b[H\x1b[2J");
+        m_map.refresh();
     }
 }
 
