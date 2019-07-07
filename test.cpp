@@ -657,123 +657,6 @@ private:
     CTaskQueue<CommandType> m_queCmd;
 };
 
-void thread_func(CSnowFlake* p)
-{
-    std::thread::id id = std::this_thread::get_id();
-    uint64_t sid = 0;
-    for(int i = 0; i < 10; ++ i)
-    {
-        sid = p->get_sid();
-        std::cout << " thread " << id << " get: " << sid << '\n';
-    }
-}
-
-struct geordinate{
-    int x;
-    int y;
-};
-
-struct Geo{
-    float lon;
-    float lat;
-};
-
-void print_matrix()
-{
-    char buff[256] = { 0 };
-
-    //预定义10组二维坐标
-    Geo geo[10] = { 0 };
-    int idx = 0;
-    int len = 0;
-    float read_lon, read_lat = 0;
-
-    std::ifstream input_file("/Users/xiangyu/Desktop/意大利苍耳国内分布数据.txt");
-    if(input_file.is_open()){
-        input_file.seekg(0, input_file.end);
-        len = input_file.tellg();
-        printf("file length = %d\n", len);
-        input_file.seekg(0, input_file.beg);
-
-        input_file.ignore(32, '\n'); //忽略掉第一行数据
-        len = input_file.tellg();
-        printf("first line length = %d\n", len);
-        std::string temp;
-        while(std::getline(input_file, temp)){
-            printf("***** temp = %s\n", temp.c_str());
-            std::istringstream istr(temp);
-            istr >> read_lon >> read_lat;
-            geo[idx].lon = read_lon;
-            geo[idx].lat = read_lat;
-            ++idx;
-            memset(buff, 0, 256);
-        }
-
-        input_file.close();
-    }else{
-        printf("read error: %d\n", errno);
-        return;
-    }
-
-    for(int i = 0; i < 10; ++i){
-        printf("%d. {%f, %f}\n", i, geo[i].lon, geo[i].lat);
-    }
-
-    float distance[10][10] = { 0 };// distance[0][1]：表示第0组坐标与第一组坐标的距离
-
-    //计算距离
-    for(int i = 0; i < 10; ++i){
-        for(int j = 0; j < 10; ++j){
-            if(i != j){
-                distance[i][j] = sqrt((geo[i].lon - geo[j].lon) * (geo[i].lon - geo[j].lon) + (geo[i].lat - geo[j].lat) * (geo[i].lat - geo[j].lat));
-            }
-        }
-    }
-
-    printf("%-10s%-10s%-10s%-10s%-10s%-10s%-10s%-10s%-10s%-10s%-10s\n",
-        "pop ID", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10");
-    printf("==============================================================================================================\n");
-    for(int i = 0; i < 10; ++i){
-        printf("%-10d", i + 1);
-        for(int j = 0; j < 10; ++j){
-            if(i != j){
-                printf("%-10.4f", distance[i][j]);
-            }else{
-                printf("%-10s", "****");
-            }
-        }
-        printf("\n");
-    }
-    printf("==============================================================================================================\n");
-
-    //将结果输出到到txt文件
-    std::ofstream output_file("/Users/xiangyu/Desktop/意大利苍耳国内分布数据_统计结果矩阵.txt");
-    if(output_file.is_open())
-    {
-        sprintf(buff, "%-10s%-10s%-10s%-10s%-10s%-10s%-10s%-10s%-10s%-10s%-10s\r\n",
-            "pop ID", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10");
-        std::string line("==============================================================================================================");
-        output_file << std::string(buff) << "\r\n"; //写第一行
-        output_file << line << "\r\n";
-        for(int i = 0; i < 10; ++i){
-            sprintf(buff, "%-10d", i + 1);
-            output_file << std::string(buff);
-            for(int j = 0; j < 10; ++j){
-                if(i != j){
-                    sprintf(buff, "%-10.4f", distance[i][j]);
-                    output_file << std::string(buff);
-                }else{
-                    sprintf(buff, "%-10s", "****");
-                    output_file << std::string(buff);
-                }
-            }
-            output_file << "\r\n";
-        }
-        output_file << line;
-        output_file.close();
-    }
-}
-
 int readFileList(const char *basePath, std::vector<std::string>& vec_img_name)
 {
     DIR *dir;
@@ -870,6 +753,10 @@ void picture_tagging()
     std::vector<std::string> vec_img_name;
     readFileList(str_pic_path.c_str(), vec_img_name);
     std::sort(vec_img_name.begin(), vec_img_name.end(), std::less<std::string>());
+    for(auto& ref : vec_img_name)
+    {
+        std::cout << ref << endl;
+    }
 
     std::cout << "输入开始标注的图片序号：";
     n_pic_num = get_input_number();
@@ -892,7 +779,7 @@ void picture_tagging()
             n_start_line_num = img_num + 1;
             for(int i = 1; i < n_start_line_num; ++i)
             {
-                ifs.ignore(10240, '\n');
+                ifs.ignore(40960, '\n');
             }
             std::getline(ifs, str_line_info);
             std::stringstream strs(str_line_info);
@@ -912,6 +799,13 @@ void picture_tagging()
     ifs.close();
     ofs.close();
 }
+
+class CPokerCard
+{
+public:
+
+private:
+};
 
 int main(int argc, char const *argv[])
 {
@@ -934,7 +828,44 @@ int main(int argc, char const *argv[])
     /*CGame game;
     game.init();
     game.start();*/
-    //readFileList("/Users/xiangyu/Desktop/文档/图片标注/data1");
-    picture_tagging();
+    //picture_tagging();
+    std::string heart("♥️");
+    std::string spade("♠️");
+    std::string club("♣️");
+    std::string diamond("♦️");
+    std::cout << heart << " size = " <<  heart.size() <<endl;
+    std::cout << spade << " size = " <<  spade.size() <<endl;
+    std::cout << club << " size = " <<  club.size() <<endl;
+    std::cout << diamond << " size = " <<  diamond.size() <<endl;
+
+    std::vector<std::string> vec_poker_number = {
+        "Ａ",
+        "１",
+        "２",
+        "３",
+        "４",
+        "５",
+        "６",
+        "７",
+        "８",
+        "９",
+        "10",
+        "Ｊ",
+        "Ｑ",
+        "Ｋ"
+    };
+
+    for(auto& ref : vec_poker_number)
+    {
+        std::cout << ref << "\r\n" << heart << endl;
+        std::cout << ref << "\r\n" << spade << endl;
+        std::cout << ref << "\r\n" << club << endl;
+        std::cout << ref << "\r\n" << diamond << endl;
+        std::cout << endl;
+    }
+
+    printf("%sＪ\r\nＯ\r\nＫ\r\nＥ\r\nＲ\n%s", BLACK, CLOSE_ATTR);
+    printf("%sＪ\r\nＯ\r\nＫ\r\nＥ\r\nＲ\n%s", RED, CLOSE_ATTR);
+    printf("");
     return 0;
 }

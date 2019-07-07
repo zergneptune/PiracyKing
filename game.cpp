@@ -22,6 +22,7 @@ void CMap::init()
         {
             m_map[i][j] = MapType::BLANK; //空白
             m_overlap[i][j] = 0;
+            m_snakeColor[i][j] = SnakeColor::RED_COLOR;
         }
     }
 
@@ -41,6 +42,7 @@ void CMap::init()
 void CMap::refresh()
 {
     int value = 0;
+    SnakeColor color;
     for(int i = 0; i < MAP_H; ++i)
     {
         for(int j = 0; j < MAP_W; ++j)
@@ -52,8 +54,39 @@ void CMap::refresh()
                     printf("%s*\033[m", m_strMapColor.c_str());
                     break;
                 case MapType::SNAKE:
-                    printf("%s@\033[m", RED);
-                    break;
+                    {
+                        color = m_snakeColor[i][j];
+                        switch(color)
+                        {
+                            case SnakeColor::BLACK_COLOR:
+                                printf("%s@\033[m", BLACK);
+                                break;
+                            case SnakeColor::RED_COLOR:
+                                printf("%s@\033[m", RED);
+                                break;
+                            case SnakeColor::GREEN_COLOR:
+                                printf("%s@\033[m", GREEN);
+                                break;
+                            case SnakeColor::YELLOW_COLOR:
+                                printf("%s@\033[m", YELLOW);
+                                break;
+                            case SnakeColor::BLUE_COLOR:
+                                printf("%s@\033[m", BLUE);
+                                break;
+                            case SnakeColor::PURPLE_COLOR:
+                                printf("%s@\033[m", PURPLE);
+                                break;
+                            case SnakeColor::DEEP_GREEN_COLOR:
+                                printf("%s@\033[m", DEEP_GREEN);
+                                break;
+                            case SnakeColor::WHITE_COLOR:
+                                printf("%s@\033[m", WHITE);
+                                break;
+                            default:
+                                printf(" ");
+                        }
+                        break;
+                    }
                 case MapType::FOOD:
                     printf("%s$\033[m", m_strFoodColor.c_str());
                     break;
@@ -63,6 +96,16 @@ void CMap::refresh()
         }
         printf("\n");
     }
+}
+
+void CMap::set_snake_color(int x, int y, SnakeColor color)
+{
+    m_snakeColor[x][y] = color;
+}
+
+SnakeColor CMap::get_snake_color(int x, int y)
+{
+    return m_snakeColor[x][y];
 }
 
 void CMap::random_make_food()
@@ -82,8 +125,8 @@ void CMap::random_make_food()
 
 CSnake::CSnake(){}
 
-CSnake::CSnake(CMap* pmap, std::string color):
-	m_pMap(pmap), m_strColor(color){}
+CSnake::CSnake(CMap* pmap, SnakeColor color):
+	m_pMap(pmap), m_color(color){}
 
 CSnake::~CSnake(){}
 
@@ -105,6 +148,8 @@ void CSnake::init()
                 (*m_pMap)[cox-1][coy] = MapType::SNAKE;
                 (*m_pMap).inc_overlap(cox, coy);
                 (*m_pMap).inc_overlap(cox-1, coy);
+                m_pMap->set_snake_color(cox, coy, m_color);
+                m_pMap->set_snake_color(cox-1, coy, m_color);
                 m_snake.push_back(CSnakeNode(cox, coy));
                 m_snake.push_back(CSnakeNode(cox-1, coy));
                 break;
@@ -115,6 +160,8 @@ void CSnake::init()
                 (*m_pMap)[cox+1][coy] = MapType::SNAKE;
                 (*m_pMap).inc_overlap(cox, coy);
                 (*m_pMap).inc_overlap(cox+1, coy);
+                m_pMap->set_snake_color(cox, coy, m_color);
+                m_pMap->set_snake_color(cox+1, coy, m_color);
                 m_snake.push_back(CSnakeNode(cox, coy));
                 m_snake.push_back(CSnakeNode(cox+1, coy));
                 break;
@@ -125,6 +172,8 @@ void CSnake::init()
                 (*m_pMap)[cox][coy-1] = MapType::SNAKE;
                 (*m_pMap).inc_overlap(cox, coy);
                 (*m_pMap).inc_overlap(cox, coy-1);
+                m_pMap->set_snake_color(cox, coy, m_color);
+                m_pMap->set_snake_color(cox, coy-1, m_color);
                 m_snake.push_back(CSnakeNode(cox, coy));
                 m_snake.push_back(CSnakeNode(cox, coy-1));
                 break;
@@ -135,6 +184,8 @@ void CSnake::init()
                 (*m_pMap)[cox][coy+1] = MapType::SNAKE;
                 (*m_pMap).inc_overlap(cox, coy);
                 (*m_pMap).inc_overlap(cox, coy+1);
+                m_pMap->set_snake_color(cox, coy, m_color);
+                m_pMap->set_snake_color(cox, coy+1, m_color);
                 m_snake.push_back(CSnakeNode(cox, coy));
                 m_snake.push_back(CSnakeNode(cox, coy+1));
                 break;
@@ -279,13 +330,19 @@ void CSnake::move_core(int r_x, int r_y) //参数为相对移动距离
     {
         m_snake.push_front(CSnakeNode(move_to_x, move_to_y));
         (*m_pMap)[move_to_x][move_to_y] = MapType::SNAKE;
+        m_pMap->set_snake_color(move_to_x, move_to_y, m_color);
         (*m_pMap).inc_overlap(move_to_x, move_to_y);
         (*m_pMap).random_make_food();
         return;
     }
+    else if((*m_pMap)[move_to_x][move_to_y] == MapType::SNAKE)
+    {
+        //return false;
+    }
 
     (*m_pMap).inc_overlap(move_to_x, move_to_y);
     (*m_pMap)[move_to_x][move_to_y] = MapType::SNAKE;
+    m_pMap->set_snake_color(move_to_x, move_to_y, m_color);
     (*m_pMap).dec_overlap(last_x, last_y);//蛇尾离开，减少蛇尾位置重叠数
     if((*m_pMap).get_overlap(last_x, last_y) < 1)//如果蛇尾位置没有重叠数
     {

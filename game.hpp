@@ -28,6 +28,18 @@ enum MapType
     FOOD
 };
 
+enum SnakeColor
+{
+    BLACK_COLOR = 0,
+    RED_COLOR,
+    GREEN_COLOR,
+    YELLOW_COLOR,
+    BLUE_COLOR,
+    PURPLE_COLOR,
+    DEEP_GREEN_COLOR,
+    WHITE_COLOR
+};
+
 enum GameOptType
 {
     MOVE_FORWARD = 0,
@@ -100,6 +112,10 @@ public:
         return m_overlap[x][y];
     }
 
+    void set_snake_color(int x, int y, SnakeColor color);
+
+    SnakeColor get_snake_color(int x, int y);
+
     void random_make_food();
 
 private:
@@ -108,6 +124,8 @@ private:
     std::string     m_strFoodColor;
 
     int             m_map[MAP_H][MAP_W];
+
+    SnakeColor      m_snakeColor[MAP_H][MAP_W];
 
     int             m_overlap[MAP_H][MAP_W];
 };
@@ -128,7 +146,7 @@ class CSnake
 {
 public:
     CSnake();
-    CSnake(CMap* pmap, std::string color = RED);
+    CSnake(CMap* pmap, SnakeColor color = SnakeColor::YELLOW_COLOR);
     ~CSnake();
 
 public:
@@ -147,14 +165,14 @@ public:
 
     GameOptType get_move_direction();
 
-    void set_color(std::string color)
+    void set_color(SnakeColor color)
     {
-        m_strColor = color;
+        m_color = color;
     }
 
-    std::string get_color()
+    SnakeColor get_color()
     {
-        return m_strColor;
+        return m_color;
     }
 
     void add_node(CSnakeNode node)
@@ -172,7 +190,7 @@ private:
 
     CMap*           m_pMap;
 
-    std::string     m_strColor;
+    SnakeColor      m_color;
 
     std::mutex      m_mt;
 };
