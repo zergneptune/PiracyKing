@@ -1150,14 +1150,14 @@ void CGameClient::random_make_snake()
     int cox, coy, value = 0;
     for(auto iter = m_mapSnake.begin(); iter != m_mapSnake.end(); ++ iter)
     {
-        std::cout << "cid = " << iter->first << std::endl;
+        SnakeColor color = iter->second->get_color();
+        std::cout << "cid = " << iter->first << ", color = " << color << std::endl;
         while(1)
         {
             cox = 1 + rand() % (MAP_H - 2);
             coy = 1 + rand() % (MAP_W - 2);
             std::cout << "cox = " << cox << ", coy = " << coy << std::endl;
             value = m_map[cox][coy];
-            SnakeColor color = iter->second->get_color();
             if(value != MapType::SNAKE)
             {
                 if(m_map[cox-1][coy] != MapType::SNAKE)
