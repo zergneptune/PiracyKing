@@ -736,8 +736,8 @@ int CClientMng::room_list_menu(uint64_t& nRoomId, std::string& strRoomName)
             return -1;
         }
         printf("\n\t\t**************************\r\n");
-        printf("\t\tS. 刷新房间列表");
-        printf("\t\t房间号. 加入房间");
+        printf("\t\tS. 刷新房间列表\r\n");
+        printf("\t\t房间号. 加入房间\r\n");
         printf("\t\t0. 退出房间\r\n");
         printf("\t\t**************************\r\n");
         printf("\t\t输入: ");
