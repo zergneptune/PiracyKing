@@ -869,7 +869,7 @@ int CClientMng::player_list_menu(uint64_t nRoomId, std::string& strRoomName)
                     game_start(nRoomId);
                 }
             }
-            else if(nInput == 3)
+            else if(nInput == 2)
             {
                 set_color_menu();
             }
