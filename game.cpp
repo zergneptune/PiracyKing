@@ -451,6 +451,30 @@ bool CGame::quit_ready(G_ClientID client)
     return true;
 }
 
+bool CGame::set_player_color(G_ClientID client, SnakeColor color)
+{
+    std::lock_guard<std::mutex> lock(m_mtx);
+    auto iter = m_mapPlayerStatus.find(client);
+    if(iter != m_mapPlayerStatus.end())
+    {
+        iter->second.m_color = color;
+    }
+
+    return true;
+}
+
+bool CGame::get_player_color(G_ClientID client, SnakeColor& color)
+{
+    std::lock_guard<std::mutex> lock(m_mtx);
+    auto iter = m_mapPlayerStatus.find(client);
+    if(iter != m_mapPlayerStatus.end())
+    {
+        color = iter->second.m_color;
+    }
+
+    return true;
+}
+
 bool CGame::get_ready_status(G_ClientID client)
 {
     std::lock_guard<std::mutex> lock(m_mtx);
@@ -783,6 +807,32 @@ int CGameServer::quit_game_ready(G_GameID gid, int cid)
     return -1;
 }
 
+int CGameServer::set_game_client_color(G_GameID gid, int cid, SnakeColor color)
+{
+    std::lock_guard<std::mutex> lck(m_mtx);
+    auto iter = m_mapGame.find(gid);
+    if(iter != m_mapGame.end())
+    {
+        iter->second->set_player_color(cid, color);
+        return 0;
+    }
+    
+    return -1;
+}
+
+int CGameServer::get_game_client_color(G_GameID gid, int cid, SnakeColor& color)
+{
+    std::lock_guard<std::mutex> lck(m_mtx);
+    auto iter = m_mapGame.find(gid);
+    if(iter != m_mapGame.end())
+    {
+        iter->second->get_player_color(cid, color);
+        return 0;
+    }
+
+    return -1;
+}
+
 void CGameServer::game_start(G_GameID gid)
 {
     std::lock_guard<std::mutex> lck(m_mtx);
@@ -1107,6 +1157,7 @@ void CGameClient::random_make_snake()
             coy = 1 + rand() % (MAP_W - 2);
             std::cout << "cox = " << cox << ", coy = " << coy << std::endl;
             value = m_map[cox][coy];
+            SnakeColor color = iter->second->get_color();
             if(value != MapType::SNAKE)
             {
                 if(m_map[cox-1][coy] != MapType::SNAKE)
@@ -1115,6 +1166,8 @@ void CGameClient::random_make_snake()
                     m_map[cox-1][coy] = MapType::SNAKE;
                     m_map.inc_overlap(cox, coy);
                     m_map.inc_overlap(cox-1, coy);
+                    m_map.set_snake_color(cox, coy, color);
+                    m_map.set_snake_color(cox-1, coy, color);
                     iter->second->add_node(CSnakeNode(cox, coy));
                     iter->second->add_node(CSnakeNode(cox-1, coy));
                     break;
@@ -1125,6 +1178,8 @@ void CGameClient::random_make_snake()
                     m_map[cox+1][coy] = MapType::SNAKE;
                     m_map.inc_overlap(cox, coy);
                     m_map.inc_overlap(cox+1, coy);
+                    m_map.set_snake_color(cox, coy, color);
+                    m_map.set_snake_color(cox-1, coy, color);
                     iter->second->add_node(CSnakeNode(cox, coy));
                     iter->second->add_node(CSnakeNode(cox+1, coy));
                     break;
@@ -1135,6 +1190,8 @@ void CGameClient::random_make_snake()
                     m_map[cox][coy-1] = MapType::SNAKE;
                     m_map.inc_overlap(cox, coy);
                     m_map.inc_overlap(cox, coy-1);
+                    m_map.set_snake_color(cox, coy, color);
+                    m_map.set_snake_color(cox-1, coy, color);
                     iter->second->add_node(CSnakeNode(cox, coy));
                     iter->second->add_node(CSnakeNode(cox, coy-1));
                     break;
@@ -1145,6 +1202,8 @@ void CGameClient::random_make_snake()
                     m_map[cox][coy+1] = MapType::SNAKE;
                     m_map.inc_overlap(cox, coy);
                     m_map.inc_overlap(cox, coy+1);
+                    m_map.set_snake_color(cox, coy, color);
+                    m_map.set_snake_color(cox-1, coy, color);
                     iter->second->add_node(CSnakeNode(cox, coy));
                     iter->second->add_node(CSnakeNode(cox, coy+1));
                     break;
@@ -1152,6 +1211,32 @@ void CGameClient::random_make_snake()
             }
         }
     }
+}
+
+bool CGameClient::set_client_color(G_ClientID cid, SnakeColor color)
+{
+    std::lock_guard<std::mutex> lck(m_mtx_snake);
+    auto iter = m_mapSnake.find(cid);
+    if(iter != m_mapSnake.end())
+    {
+        iter->second->set_color(color);
+        return true;
+    }
+
+    return false;
+}
+
+bool CGameClient::get_client_color(G_ClientID cid, SnakeColor& color)
+{
+    std::lock_guard<std::mutex> lck(m_mtx_snake);
+    auto iter = m_mapSnake.find(cid);
+    if(iter != m_mapSnake.end())
+    {
+        color = iter->second->get_color();
+        return true;
+    }
+
+    return false;
 }
 
 void CGameClient::add_game_frame(TGameFrameUdp* pGameFrame)

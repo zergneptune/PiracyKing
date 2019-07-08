@@ -666,8 +666,8 @@ int CClientMng::main_menu()
         printf("**********************\r\n");
         printf("\t1. 加入房间\n");
         printf("\t2. 创建房间\n");
+        printf("\t0. 登出\r\n");
         printf("**********************\r\n");
-        printf("\t(提示: 输入0登出)\r\n");
         printf("\t输入: ");
         nInput = get_input_number();
         switch(nInput)
@@ -715,7 +715,7 @@ int CClientMng::room_list_menu(uint64_t& nRoomId, std::string& strRoomName)
         reader.parse(strRoomList, root);
         nCnt = 0;
         printf("\x1b[H\x1b[2J");
-        printf("***********  房间列表  ***********\r\n");
+        printf("===========  房间列表  ===========\r\n");
         if(root.isArray())
         {
             for(Json::Value::iterator iter = root.begin();
@@ -726,17 +726,21 @@ int CClientMng::room_list_menu(uint64_t& nRoomId, std::string& strRoomName)
                                                     (*iter)["gname"].asString().c_str(),
                                                     (*iter)["players"].asInt());
             }
-            printf("*********************************\r\n");
+            printf("=================================\r\n");
         }
         else
         {
             printf("\tempty list\n");
-            printf("*********************************\r\n");
+            printf("=================================\r\n");
             enter_any_key_to_continue();
             return -1;
         }
-        printf("\t(提示: 输入0返回, 输入房间序号加入房间, 输入其他数字刷新房间列表)\r\n");
-        printf("\t输入: ");
+        printf("\n\t\t**************************\r\n");
+        printf("\t\tS. 刷新房间列表");
+        printf("\t\t房间号. 加入房间");
+        printf("\t\t0. 退出房间\r\n");
+        printf("\t\t**************************\r\n");
+        printf("\t\t输入: ");
         nInput = get_input_number();
         if(nInput >= 1 && nInput <= nCnt)
         {
@@ -779,7 +783,7 @@ int CClientMng::player_list_menu(uint64_t nRoomId, std::string& strRoomName)
 
         Json::Value player_list = root["client_info"];
         printf("\x1b[H\x1b[2J");
-        printf("***********  房间: %s  ***********\r\n", strRoomName.c_str());
+        printf("=========== 房间: %s ===========\r\n", strRoomName.c_str());
         if(player_list.isArray())
         {
             for(Json::Value::iterator iter = player_list.begin();
@@ -799,26 +803,34 @@ int CClientMng::player_list_menu(uint64_t nRoomId, std::string& strRoomName)
                                 (*iter)["name"].asString().c_str());
                 }
             }
-            printf("*********************************\r\n");
+            printf("=================================\r\n");
         }
         else
         {
             printf("\tempty list\n");
-            printf("*********************************\r\n");
+            printf("=================================\r\n");
             enter_any_key_to_continue();
             return -1;
         }
 
         if(bIsRoomOwner)
         {
-            printf("\t(提示: 输入0退出房间, 输入其他数字刷新玩家列表)\r\n");
-            printf("\t(您是队长: 输入1开始游戏)\r\n");
+            printf("\n\t\t**************************\r\n");
+            printf("\t\t1. 开始游戏\r\n");
+            printf("\t\t2. 修改蛇身颜色\r\n");
+            printf("\t\t3. 刷新房间玩家列表\r\n");
+            printf("\t\t0. 退出房间\r\n");
         }
         else
         {
-            printf("\t(提示: 输入0退出房间, 输入1游戏准备, 输入其他数字刷新玩家列表)\r\n");
+            printf("\n\t\t**************************\r\n");
+            printf("\t\t1. 游戏准备\r\n");
+            printf("\t\t2. 修改蛇身颜色\r\n");
+            printf("\t\t3. 刷新房间玩家列表\r\n");
+            printf("\t\t0. 退出房间\r\n");
         }
-        printf("\t输入: ");
+        printf("\t\t**************************\r\n");
+        printf("\t\t输入: ");
         nInput = get_input_number();
         if(bIsRoomOwner)
         {
@@ -834,6 +846,10 @@ int CClientMng::player_list_menu(uint64_t nRoomId, std::string& strRoomName)
                 {
                     game_start(nRoomId);
                 }
+            }
+            else if(nInput == 2)
+            {
+                set_color_menu();
             }
         }
         else
@@ -853,8 +869,70 @@ int CClientMng::player_list_menu(uint64_t nRoomId, std::string& strRoomName)
                     game_start(nRoomId);
                 }
             }
+            else if(nInput == 3)
+            {
+                set_color_menu();
+            }
         }
     }
+}
+
+int CClientMng::set_color_menu()
+{
+    printf("\x1b[H\x1b[2J");
+    printf("\n\t\t--------------------\r\n");
+    printf("\t\t1. %s黑色\r\n%s", BLACK, CLOSE_ATTR);
+    printf("\t\t2. %s红色\r\n%s", RED, CLOSE_ATTR);
+    printf("\t\t3. %s绿色\r\n%s", GREEN, CLOSE_ATTR);
+    printf("\t\t4. %s黄色\r\n%s", YELLOW, CLOSE_ATTR);
+    printf("\t\t5. %s蓝色\r\n%s", BLUE, CLOSE_ATTR);
+    printf("\t\t6. %s紫色\r\n%s", PURPLE, CLOSE_ATTR);
+    printf("\t\t7. %s深绿色\r\n%s", DEEP_GREEN, CLOSE_ATTR);
+    printf("\t\t8. %s白色\r\n%s", WHITE, CLOSE_ATTR);
+    printf("\t\t--------------------\r\n");
+    printf("\t\t输入：");
+    int n_input;
+    while(1)
+    {
+        n_input = get_input_number();
+        if(n_input > 0 && n_input < 9)
+        {
+            break;
+        }
+        printf("\t\t请输入正确的选项：");
+    }
+
+    switch(n_input)
+    {
+        case 1:
+            m_pGameClient->set_client_color(m_nClientID, SnakeColor::BLACK_COLOR);
+            break;
+        case 2:
+            m_pGameClient->set_client_color(m_nClientID, SnakeColor::RED_COLOR);
+            break;
+        case 3:
+            m_pGameClient->set_client_color(m_nClientID, SnakeColor::GREEN_COLOR);
+            break;
+        case 4:
+            m_pGameClient->set_client_color(m_nClientID, SnakeColor::YELLOW_COLOR);
+            break;
+        case 5:
+            m_pGameClient->set_client_color(m_nClientID, SnakeColor::BLUE_COLOR);
+            break;
+        case 6:
+            m_pGameClient->set_client_color(m_nClientID, SnakeColor::PURPLE_COLOR);
+            break;
+        case 7:
+            m_pGameClient->set_client_color(m_nClientID, SnakeColor::DEEP_GREEN_COLOR);
+            break;
+        case 8:
+            m_pGameClient->set_client_color(m_nClientID, SnakeColor::WHITE_COLOR);
+            break;
+        default:
+            break;
+
+    }
+    return 0;
 }
 
 int CClientMng::regist()
@@ -1178,8 +1256,11 @@ int CClientMng::game_ready(uint64_t gid)
     uint64_t nSid = m_cSnowFlake.get_sid();
     Json::Value root;
     Json::FastWriter fwriter;
+    SnakeColor color;
+    m_pGameClient->get_client_color(m_nClientID, color);
     root["gid"] = gid;
     root["cid"] = m_nClientID;
+    root["color"] = static_cast<int>(color);
     m_queSendMsg.AddTask(make_shared<TTaskData>(
                                     nSid,
                                     m_nServerSockfd,
@@ -1322,7 +1403,10 @@ void CClientMng::set_start(std::shared_ptr<TTaskData>& pTask)
                 iter != game_players.end();
                 ++ iter)
         {
-            m_pGameClient->add_snake((*iter).asInt());
+            int cid = (*iter)["cid"].asInt();
+            int color = (*iter)["color"].asInt();
+            m_pGameClient->add_snake(cid);
+            m_pGameClient->set_client_color(cid, static_cast<SnakeColor>(color));
         }
 
         //设置随机种子
@@ -1363,6 +1447,9 @@ void CClientMng::send_game_player_cmd(std::shared_ptr<TTaskData>& pTask)
 int CClientMng::request_start_game(uint64_t gid)
 {
     uint64_t nSid = m_cSnowFlake.get_sid();
+    SnakeColor color;
+    m_pGameClient->get_client_color(m_nClientID, color);
+    int n_color = static_cast<int>(color);
     Json::Value root;
     Json::FastWriter fwriter;
     root["gid"] = gid;
@@ -1395,6 +1482,8 @@ int CClientMng::request_start_game(uint64_t gid)
             //发送开始游戏命令
             root.clear();
             root["gid"] = gid;
+            root["cid"] = m_nClientID;
+            root["room_owner_color"] = n_color;
             m_queSendMsg.AddTask(make_shared<TTaskData>(
                                         0,
                                         m_nServerSockfd,
@@ -1510,8 +1599,8 @@ int CClientMng::init_thread()
 
 int main()
 {
-	//string IP("192.168.1.188");
-    string IP("192.168.2.143");
+	string IP("192.168.1.188");
+    //string IP("192.168.2.143");
 	int port = 10086;
 	//std::cout<< "请输入ip: ";
 	//cin>>IP;

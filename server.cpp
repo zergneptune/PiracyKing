@@ -1270,6 +1270,7 @@ void CServerMng::do_game_ready(std::shared_ptr<TTaskData>& pTask)
     {
         uint64_t gid = root["gid"].asUInt64();
         int cid = root["cid"].asInt();
+        int color = root["color"].asInt();
         root.clear();
         int nRes = m_pGameServer->game_ready(gid, cid);
         if(nRes < 0)
@@ -1279,6 +1280,7 @@ void CServerMng::do_game_ready(std::shared_ptr<TTaskData>& pTask)
         }
         else
         {
+            m_pGameServer->set_game_client_color(gid, cid, static_cast<SnakeColor>(color));
             root["res"] = 0;
         }
     }
@@ -1340,15 +1342,23 @@ void CServerMng::do_game_start(std::shared_ptr<TTaskData>& pTask)
     if(reader.parse(pTask->strMsg, root))
     {
         uint64_t gid = root["gid"].asUInt64();
+        int cid = root["cid"].asInt();
+        int room_owner_color = root["room_owner_color"].asInt();
+        m_pGameServer->set_game_client_color(gid, cid, static_cast<SnakeColor>(room_owner_color));
         m_pGameServer->get_cid_list(gid, vecCids);
         root.clear();
         root["res"] = 0;
         int nRandSeed = time(NULL);
         root["rand_seed"] = nRandSeed;
         Json::Value game_players;
+        SnakeColor color;
         for(auto& cid : vecCids)
         {
-            game_players.append(Json::Value(cid));
+            Json::Value player_info;
+            player_info["cid"] = cid;
+            m_pGameServer->get_game_client_color(gid, cid, color);
+            player_info["color"] = static_cast<int>(color);
+            game_players.append(Json::Value(player_info));
         }
         root["cids"] = game_players;
 

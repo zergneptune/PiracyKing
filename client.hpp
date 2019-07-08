@@ -79,6 +79,8 @@ private:
 
 	int player_list_menu(uint64_t nRoomId, std::string& strRoomName);
 
+	int set_color_menu();
+
 private:
 	int             m_nKq;
 

@@ -202,7 +202,8 @@ class CGame
         TPlayerStatus(): m_nReadyGame(0){}
         ~TPlayerStatus(){}
 
-        int  m_nReadyGame;
+        int         m_nReadyGame;
+        SnakeColor  m_color;
     };
 
     typedef uint64_t G_GameID;
@@ -226,6 +227,10 @@ public:
     bool ready(G_ClientID client);
 
     bool quit_ready(G_ClientID client);
+
+    bool set_player_color(G_ClientID client, SnakeColor color);
+
+    bool get_player_color(G_ClientID client, SnakeColor& color);
 
     bool get_ready_status(G_ClientID client);
 
@@ -302,6 +307,10 @@ public:
 
     int quit_game_ready(G_GameID gid, int cid);
 
+    int set_game_client_color(G_GameID gid, int cid, SnakeColor color);
+
+    int get_game_client_color(G_GameID gid, int cid, SnakeColor& color);
+
     void game_start(G_GameID gid);
 
     void game_over(G_GameID gid);
@@ -355,6 +364,10 @@ public:
     void clear_snake();
 
     void random_make_snake();
+
+    bool set_client_color(G_ClientID, SnakeColor);
+
+    bool get_client_color(G_ClientID, SnakeColor&);
 
     void add_game_frame(TGameFrameUdp* pGameFrame);
 
