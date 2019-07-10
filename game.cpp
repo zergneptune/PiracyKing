@@ -94,6 +94,7 @@ void CMap::refresh()
                     printf(" ");
             }
         }
+        printf("\t（提示：连续按2下ESC键退出游戏。）");
         printf("\n");
     }
 }
