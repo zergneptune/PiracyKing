@@ -470,6 +470,7 @@ using namespace std;
 CClientMng::CClientMng()
 {
     m_pGameClient = new CGameClient(&m_queTaskData);
+    m_color = SnakeColor::RED_COLOR;
 }
 
 CClientMng::~CClientMng(){}
