@@ -94,10 +94,10 @@ void CMap::refresh()
                     printf(" ");
             }
         }
-        if(i == 0)
+        if(i == MAP_H / 2)
             printf("\t（提示👆：连续按2下ESC键退出游戏。）");
-        else if(i == 2)
-            printf("\t☠️游戏进行中☠️");
+        else if(i == (MAP_H / 2 + 2))
+            printf("\t☠️ 游戏进行中 ☠️");
 
         printf("\n");
     }
