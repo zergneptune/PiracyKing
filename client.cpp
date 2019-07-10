@@ -905,32 +905,31 @@ int CClientMng::set_color_menu()
     switch(n_input)
     {
         case 1:
-            m_pGameClient->set_client_color(m_nClientID, SnakeColor::BLACK_COLOR);
+            m_color = SnakeColor::BLACK_COLOR;
             break;
         case 2:
-            m_pGameClient->set_client_color(m_nClientID, SnakeColor::RED_COLOR);
+            m_color = SnakeColor::RED_COLOR;
             break;
         case 3:
-            m_pGameClient->set_client_color(m_nClientID, SnakeColor::GREEN_COLOR);
+            m_color = SnakeColor::GREEN_COLOR;
             break;
         case 4:
-            m_pGameClient->set_client_color(m_nClientID, SnakeColor::YELLOW_COLOR);
+            m_color = SnakeColor::YELLOW_COLOR;
             break;
         case 5:
-            m_pGameClient->set_client_color(m_nClientID, SnakeColor::BLUE_COLOR);
+            m_color = SnakeColor::BLUE_COLOR;
             break;
         case 6:
-            m_pGameClient->set_client_color(m_nClientID, SnakeColor::PURPLE_COLOR);
+            m_color = SnakeColor::PURPLE_COLOR;
             break;
         case 7:
-            m_pGameClient->set_client_color(m_nClientID, SnakeColor::DEEP_GREEN_COLOR);
+            m_color = SnakeColor::DEEP_GREEN_COLOR;
             break;
         case 8:
-            m_pGameClient->set_client_color(m_nClientID, SnakeColor::WHITE_COLOR);
+            m_color = SnakeColor::WHITE_COLOR;
             break;
         default:
             break;
-
     }
     return 0;
 }
@@ -1122,7 +1121,6 @@ int CClientMng::create_room(uint64_t& gid, std::string& strRoomName)
             gid = root["gid"].asUInt64();
             strRoomName = root["gname"].asString();
         }
-
         return nRet;
     }
 
@@ -1160,7 +1158,6 @@ int CClientMng::quit_room(uint64_t gid)
             cout << "退出房间失败：" << root["msg"].asString() << endl;
             enter_any_key_to_continue();
         }
-
         return nRet;
     }
 
@@ -1256,11 +1253,9 @@ int CClientMng::game_ready(uint64_t gid)
     uint64_t nSid = m_cSnowFlake.get_sid();
     Json::Value root;
     Json::FastWriter fwriter;
-    SnakeColor color;
-    m_pGameClient->get_client_color(m_nClientID, color);
     root["gid"] = gid;
     root["cid"] = m_nClientID;
-    root["color"] = static_cast<int>(color);
+    root["color"] = m_color;
     m_queSendMsg.AddTask(make_shared<TTaskData>(
                                     nSid,
                                     m_nServerSockfd,
@@ -1447,9 +1442,6 @@ void CClientMng::send_game_player_cmd(std::shared_ptr<TTaskData>& pTask)
 int CClientMng::request_start_game(uint64_t gid)
 {
     uint64_t nSid = m_cSnowFlake.get_sid();
-    SnakeColor color;
-    m_pGameClient->get_client_color(m_nClientID, color);
-    int n_color = static_cast<int>(color);
     Json::Value root;
     Json::FastWriter fwriter;
     root["gid"] = gid;
@@ -1483,7 +1475,7 @@ int CClientMng::request_start_game(uint64_t gid)
             root.clear();
             root["gid"] = gid;
             root["cid"] = m_nClientID;
-            root["room_owner_color"] = n_color;
+            root["room_owner_color"] = m_color;
             m_queSendMsg.AddTask(make_shared<TTaskData>(
                                         0,
                                         m_nServerSockfd,

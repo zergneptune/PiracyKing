@@ -1351,9 +1351,9 @@ void CServerMng::do_game_start(std::shared_ptr<TTaskData>& pTask)
         int nRandSeed = time(NULL);
         root["rand_seed"] = nRandSeed;
         Json::Value game_players;
-        SnakeColor color;
         for(auto& cid : vecCids)
         {
+            SnakeColor color;
             Json::Value player_info;
             player_info["cid"] = cid;
             m_pGameServer->get_game_client_color(gid, cid, color);

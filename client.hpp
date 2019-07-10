@@ -1,6 +1,6 @@
 #pragma once
 #include "utility.hpp"
-class CGameClient; 
+class CGameClient;
 
 int connect_server(char* server_ip, int server_port);
 
@@ -35,13 +35,13 @@ public:
 
 	int wait_to_start();
 
-	void set_start(std::shared_ptr<TTaskData>& pTask);
-
 	void send_game_player_cmd(std::shared_ptr<TTaskData>& pTask);
 
 	int request_start_game(uint64_t gid);
 
 	void game_start(uint64_t gid);
+
+	void set_start(std::shared_ptr<TTaskData>& pTask);
 
 	void quit_game(uint64_t gid);
 
@@ -87,6 +87,8 @@ private:
     int             m_nServerSockfd;
 
     int 			m_nClientID;
+
+    int             m_color;
 
     uint64_t        m_nCurrGameID; //当前游戏id
     
