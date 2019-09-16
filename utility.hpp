@@ -21,6 +21,34 @@
 #define DEEP_GREEN  "\033[36m"
 #define WHITE       "\033[37m"
 
+// 上移光标
+#define MOVEUP(x) printf("\033[%dA", (x)); fflush(stdout)
+ 
+// 下移光标
+#define MOVEDOWN(x) printf("\033[%dB", (x)); fflush(stdout)
+ 
+// 左移光标
+#define MOVELEFT(y) printf("\033[%dD", (y)); fflush(stdout)
+ 
+// 右移光标
+#define MOVERIGHT(y) printf("\033[%dC",(y)); fflush(stdout)
+ 
+// 定位光标
+#define MOVETO(x,y) printf("\033[%d;%dH", (x), (y)); fflush(stdout)
+ 
+// 光标复位
+#define RESET_CURSOR() printf("\033[H")
+ 
+// 隐藏光标
+#define HIDE_CURSOR() printf("\033[?25l")
+ 
+// 显示光标
+#define SHOW_CURSOR() printf("\033[?25h")
+ 
+//反显
+#define HIGHT_LIGHT() printf("\033[7m")
+#define UN_HIGHT_LIGHT() printf("\033[27m")
+
 //计算结构体成员偏移量
 #define OFFSET_OF(type, member) ((size_t)&(((type*)0)->member))
 

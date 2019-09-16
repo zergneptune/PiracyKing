@@ -15,6 +15,8 @@
 #include <dirent.h>
 #include "practice.hpp"
 #include "utility.hpp"
+#include "poker.hpp"
+using namespace NSP_POKER;
 /*-------  test ---------*/
 #define LUA_ROOT    "/usr/local/"
 #define LUA_LDIR    LUA_ROOT "share/lua/5.1/"
@@ -62,12 +64,6 @@ struct factorial : std::integral_constant<int,n * factorial<n-1>::value> {};
 
 template <>
 struct factorial<0> : std::integral_constant<int,1> {};
-
-
-typedef int integer_type;
-struct A { int x,y; };
-struct B { int x,y; };
-typedef A C;
 
 ////////////////////////////////////////////////////////////////////
 // 隐藏光标
@@ -800,11 +796,339 @@ void picture_tagging()
     ofs.close();
 }
 
-class CPokerCard
+class CPokerCardMng
 {
 public:
+    CPokerCardMng(){}
+    ~CPokerCardMng(){}
+
+public:
+    void init()
+    {
+        for(int i = 1; i < 14; ++ i)
+        {
+            m_vecPokerCards.push_back(CPokerCard(i, enumPokerColor::SPADE));
+        }
+
+        for(int i = 1; i < 14; ++ i)
+        {
+            m_vecPokerCards.push_back(CPokerCard(i, enumPokerColor::HEART));
+        }
+
+        for(int i = 1; i < 14; ++ i)
+        {
+            m_vecPokerCards.push_back(CPokerCard(i, enumPokerColor::CLUB));
+        }
+
+        for(int i = 1; i < 14; ++ i)
+        {
+            m_vecPokerCards.push_back(CPokerCard(i, enumPokerColor::DIAMOND));
+        }
+
+        m_vecPokerCards.push_back(CPokerCard(14));
+        m_vecPokerCards.push_back(CPokerCard(15));
+        assert(m_vecPokerCards.size() == 54);
+    }
+
+    bool random_get_one(CPokerCard& card)
+    {
+        uint64_t seed = m_snowFlake.get_sid();
+        srand(seed);
+        int nPokerNum = m_vecPokerCards.size();
+        if(nPokerNum == 0)
+        {
+            return false;
+        }
+        else
+        {
+            int nIndex = rand() % nPokerNum;
+            card = m_vecPokerCards[nIndex];
+            return true;
+        }
+    }
 
 private:
+    std::vector<CPokerCard>     m_vecPokerCards;
+    CSnowFlake                  m_snowFlake;
+};
+
+void print_poker_card()
+{
+    CPokerCard pokerCard;
+    CPokerCardMng pokerCardMng;
+    pokerCardMng.init();
+    int nPokerNum = 10;
+    for(int i = 0; i < nPokerNum; ++i)
+    {
+        pokerCardMng.random_get_one(pokerCard);
+        int nPokerNumber = pokerCard.get_number();
+        enumPokerColor pokerColor = pokerCard.get_color();
+        bool bIsJoker = false;
+        std::string print_number;
+        std::string print_color;
+        std::string joker_color;
+        switch(nPokerNumber)
+        {
+            case 1:
+                print_number = "Ａ";
+                break;
+            case 2:
+                print_number = "２";
+                break;
+            case 3:
+                print_number = "３";
+                break;
+            case 4:
+                print_number = "４";
+                break;
+            case 5:
+                print_number = "５";
+                break;
+            case 6:
+                print_number = "６";
+                break;
+            case 7:
+                print_number = "７";
+                break;
+            case 8:
+                print_number = "８";
+                break;
+            case 9:
+                print_number = "９";
+                break;
+            case 10:
+                print_number = "10";
+                break;
+            case 11:
+                print_number = "Ｊ";
+                break;
+            case 12:
+                print_number = "Ｑ";
+                break;
+            case 13:
+                print_number = "Ｋ";
+                break;
+            case 14:
+                bIsJoker = true;
+                joker_color = BLACK;
+                break;
+            case 15:
+                bIsJoker = true;
+                joker_color = RED;
+                break;
+            default:
+                break;
+        }
+
+        switch(pokerColor)
+        {
+            case enumPokerColor::SPADE:
+                print_color = "♠️";
+                break;
+            case enumPokerColor::HEART:
+                print_color = "♥️";
+                break;
+            case enumPokerColor::CLUB:
+                print_color = "♣️";
+                break;
+            case enumPokerColor::DIAMOND:
+                print_color = "♦️";
+                break;
+            default:
+                break;
+        }
+
+
+        if(i < nPokerNum - 1)
+        {
+            if(i == 0)
+            {
+                printf("  ");
+                for(int j = 0; j < 6; ++j)
+                {
+                    printf("_");
+                }
+            }
+            else
+            {
+                MOVEUP(11);
+                for(int j = 0; j < 7; ++j)
+                {
+                    printf("_");
+                }
+            }
+
+            printf("\r\n");
+            MOVERIGHT(i * 7);
+
+            if(bIsJoker)
+            {
+                printf("|%sＪ%s", joker_color.c_str(), CLOSE_ATTR);
+                printf("\r\n");
+                MOVERIGHT(i * 7);
+
+                printf("|%sＯ%s", joker_color.c_str(), CLOSE_ATTR);
+                printf("\r\n");
+                MOVERIGHT(i * 7);
+
+                printf("|%sＫ%s", joker_color.c_str(), CLOSE_ATTR);
+                printf("\r\n");
+                MOVERIGHT(i * 7);
+
+                printf("|%sＥ%s", joker_color.c_str(), CLOSE_ATTR);
+                printf("\r\n");
+                MOVERIGHT(i * 7);
+
+                printf("|%sＲ%s", joker_color.c_str(), CLOSE_ATTR);
+                printf("\r\n");
+                MOVERIGHT(i * 7);
+            }
+            else
+            {
+                printf("|%s", print_number.c_str());
+                printf("\r\n");
+                MOVERIGHT(i * 7);
+
+                printf("|%s", print_color.c_str());
+                printf("\r\n");
+                MOVERIGHT(i * 7);
+
+                for(int j = 0; j < 3; ++j)
+                {
+                    printf("|%-5s", " ");
+                    printf("\r\n");
+                    MOVERIGHT(i * 7);
+                }
+            }
+
+            for(int j = 0; j < 5; ++j)
+            {
+                printf("|%-5s", " ");
+                printf("\r\n");
+                MOVERIGHT(i * 7);
+            }
+
+            printf("|");
+            for(int j = 0; j < 6; ++j)
+            {
+                printf("_");
+            }
+        }
+        else
+        {
+            MOVEUP(11);
+            for(int j = 0; j < 14; ++j)
+            {
+                printf("_");
+            }
+            printf("\r\n");
+            MOVERIGHT(i * 7);
+
+            if(bIsJoker)
+            {
+                printf("|%s%-14s%s|", joker_color.c_str(), "Ｊ", CLOSE_ATTR);
+
+                printf("\r\n");
+                MOVERIGHT(i * 7);
+
+                printf("|%s%-14s%s|", joker_color.c_str(), "Ｏ", CLOSE_ATTR);
+                printf("\r\n");
+                MOVERIGHT(i * 7);
+
+                printf("|%s%-14s%s|", joker_color.c_str(), "Ｋ", CLOSE_ATTR);
+                printf("\r\n");
+                MOVERIGHT(i * 7);
+
+                printf("|%s%-14s%s|", joker_color.c_str(), "Ｅ", CLOSE_ATTR);
+                printf("\r\n");
+                MOVERIGHT(i * 7);
+
+                printf("|%s%-14s%s|", joker_color.c_str(), "Ｒ", CLOSE_ATTR);
+                printf("\r\n");
+                MOVERIGHT(i * 7);
+
+                for(int j = 0; j < 5; ++j)
+                {
+                    printf("|%-13s|", " ");
+                    printf("\r\n");
+                    MOVERIGHT(i * 7);
+                }
+
+                printf("|");
+                for(int j = 0; j < 13; ++j)
+                {
+                    printf("_");
+                }
+                printf("|");
+                printf("\r\n");
+            }
+            else
+            {
+                if(nPokerNumber == 10)
+                {
+                    printf("|%-13s|", print_number.c_str());
+                }
+                else
+                {
+                    printf("|%-14s|", print_number.c_str());
+                }
+                
+                printf("\r\n");
+                MOVERIGHT(i * 7);
+
+                printf("|%-18s|", print_color.c_str());
+                printf("\r\n");
+                MOVERIGHT(i * 7);
+
+                for(int j = 0; j < 8; ++j)
+                {
+                    printf("|%-13s|", " ");
+                    printf("\r\n");
+                    MOVERIGHT(i * 7);
+                }
+
+                printf("|");
+                for(int j = 0; j < 13; ++j)
+                {
+                    printf("_");
+                }
+                printf("|");
+                printf("\r\n");
+            }
+        }
+    }
+}
+
+class B;
+
+class A
+{
+public:
+    A(){
+        printf("construct A.\n");
+    }
+
+    ~A(){
+        printf("destruct A.\n");
+    }
+
+    //std::shared_ptr<B> m_spb;
+    std::weak_ptr<B> m_spb;
+};
+
+class B
+{
+public:
+    B(){
+        printf("construct B.\n");
+    }
+
+    ~B(){
+        printf("destruct B.\n");
+    }
+
+    //std::shared_ptr<A> m_spa;
+    std::weak_ptr<A> m_spa;
 };
 
 int main(int argc, char const *argv[])
@@ -816,19 +1140,12 @@ int main(int argc, char const *argv[])
 	cout << factorial<5>::value << endl;  // constexpr (no calculations on runtime)
 	static_assert(has_member_foo11<MyStruct>::value, "MyStruct has foo");
 	static_assert(has_member_foo11<MyStruct, int>::value, "MyStruct has foo");
-
-	cout << std::boolalpha;
-	cout << "is_same:" << std::endl;
-	cout << "int, const int: " << std::is_same<int, const int>::value << std::endl;
-	cout << "int, integer_type: " << std::is_same<int, integer_type>::value << std::endl;
-	cout << "A, B: " << std::is_same<A,B>::value << std::endl;
-	cout << "A, C: " << std::is_same<A,C>::value << std::endl;
-	cout << "signed char, std::int8_t: " << std::is_same<signed char,std::int8_t>::value << std::endl;
 	*/
     /*CGame game;
     game.init();
     game.start();*/
     //picture_tagging();
+    
     std::string heart("♥️");
     std::string spade("♠️");
     std::string club("♣️");
@@ -855,17 +1172,25 @@ int main(int argc, char const *argv[])
         "Ｋ"
     };
 
-    for(auto& ref : vec_poker_number)
-    {
-        std::cout << ref << "\r\n" << heart << endl;
-        std::cout << ref << "\r\n" << spade << endl;
-        std::cout << ref << "\r\n" << club << endl;
-        std::cout << ref << "\r\n" << diamond << endl;
-        std::cout << endl;
-    }
+    std::vector<std::string> vec_poker_color = {
+        "♠️",
+        "♥️",
+        "♣️",
+        "♦️"
+    };
 
-    printf("%sＪ\r\nＯ\r\nＫ\r\nＥ\r\nＲ\n%s", BLACK, CLOSE_ATTR);
-    printf("%sＪ\r\nＯ\r\nＫ\r\nＥ\r\nＲ\n%s", RED, CLOSE_ATTR);
-    printf("");
+    //print_poker_card();
+
+    {
+        std::shared_ptr<A> spa(new A());
+        std::shared_ptr<B> spb(new B());
+        printf("spa->use_count = %d\n", spa.use_count());
+        printf("spb->use_count = %d\n", spb.use_count());
+        spa->m_spb = spb;
+        spb->m_spa = spa;
+        printf("spa->use_count = %d\n", spa.use_count());
+        printf("spb->use_count = %d\n", spb.use_count());
+    };
+
     return 0;
 }

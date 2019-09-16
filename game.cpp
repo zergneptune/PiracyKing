@@ -1366,5 +1366,3 @@ void CGameClient::refresh_thread_func()
 
 
 
-
-
