@@ -9,7 +9,7 @@ OBJ5 = utility.o
 OBJ6 = poker.o
 
 test : $(OBJ1) $(OBJ5) $(OBJ6)
-	g++ $(OBJ1) $(OBJ5) $(OBJ6) -o test
+	g++ $(OBJ1) $(OBJ5) $(OBJ6) -ljsoncpp -o test
 server : $(OBJ2) $(OBJ4) $(OBJ5)
 	g++ $(OBJ2) $(OBJ4) $(OBJ5) -ljsoncpp -o server
 client : $(OBJ3) $(OBJ4) $(OBJ5)

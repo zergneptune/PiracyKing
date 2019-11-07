@@ -356,6 +356,9 @@ std::string get_input_string();
 //遍历文件夹
 int recurse_dir(char *basePath);
 
+//读json文件
+void readJsonFile(char* jsonFilePath);
+
 
 
 

@@ -1,5 +1,6 @@
 #include "utility.hpp"
 #include <iostream>
+#include <fstream>
 #include <sys/socket.h>
 #include <unistd.h>
 #include <dirent.h>
@@ -7,6 +8,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <sys/time.h>
+#include <json/json.h>
 
 using std::cin;
 using std::cout;
@@ -279,4 +281,60 @@ int recurse_dir(char *basePath)
     }
     closedir(dir);
     return 1;
+}
+
+std::string w2c(const wchar_t * pw)
+{
+    std::string val = "";
+    if(!pw)
+    {
+        return val;
+    }
+    size_t size= wcslen(pw)*sizeof(wchar_t);
+    char *pc = NULL;
+    if(!(pc = (char*)malloc(size)))
+    {
+        return val;
+    }
+    size_t destlen = wcstombs(pc,pw,size);
+    /*转换不为空时，返回值为-1。如果为空，返回值0*/
+    if (destlen ==(size_t)(0))
+    {
+        return val;
+    }
+    val = pc;
+    delete pc;
+    return val;
+}
+
+//读json文件
+void readJsonFile(char* jsonFilePath)
+{
+    Json::Value root;//定义根节点
+    Json::Reader reader;
+    std::ifstream infile;
+    infile.open(jsonFilePath, std::ifstream::in);
+    if(infile.is_open())
+    {
+        if(reader.parse(infile, root))
+        {
+            Json::Value city_list = root["RECORDS"];
+            if(city_list.isArray())
+            {
+                std::ofstream outfile("result.json", std::ofstream::out | std::ofstream::trunc);
+                for(auto iter = city_list.begin(); iter != city_list.end(); ++iter)
+                {
+                    std::cout << "id = " << (*iter)["id"].asString() << "\t" << "name = " << (*iter)["name"].asString() << std::endl;
+                    outfile << "['" << (*iter)["id"].asString() << "'] = '" << (*iter)["name"].asString() << "',\r\n";
+                }
+                outfile.close();
+            }
+            std::cout << "size = " << city_list.size() << std::endl;
+        }
+        infile.close();
+    }
+    else
+    {
+        std::cout << "erro open " << jsonFilePath << ": " << strerror(errno) << std::endl;
+    }
 }

@@ -1180,17 +1180,7 @@ int main(int argc, char const *argv[])
     };
 
     //print_poker_card();
-
-    {
-        std::shared_ptr<A> spa(new A());
-        std::shared_ptr<B> spb(new B());
-        printf("spa->use_count = %d\n", spa.use_count());
-        printf("spb->use_count = %d\n", spb.use_count());
-        spa->m_spb = spb;
-        spb->m_spa = spa;
-        printf("spa->use_count = %d\n", spa.use_count());
-        printf("spb->use_count = %d\n", spb.use_count());
-    };
-
+    readJsonFile("city.json");
+    //alibabaCloudDownload();
     return 0;
 }
