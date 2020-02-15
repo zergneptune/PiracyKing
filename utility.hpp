@@ -264,10 +264,177 @@ int get_input_number();
 
 std::string get_input_string();
 
+/*
+ * 常用并行算法 
+ */
+class join_threads
+{
+public:
+    explicit join_threads(std::vector<std::thread>& threads_): m_threads(threads_){}
+
+    ~join_threads()
+    {
+        for (unsigned long i = 0; i < m_threads.size(); ++i)
+        {   
+            if (m_threads[i].joinable())
+            {
+                m_threads[i].join();
+            }
+        }
+    }
+
+private:
+    std::vector<std::thread>& m_threads;
+};
+
+/*
+** std::accumulate 并行版本
+*/
+template<typename Iterator, typename T>
+T accumulate_block(Iterator first, Iterator last)
+{
+    return std::accumulate(first, last, T()); 
+}
+/*
+struct accumulate_block
+{
+    T operator() (Iterator first, Iterator last)
+    {
+        return std::accumulate(first, last, T());                                                                          
+    }
+};*/
 
 
+template<typename Iterator, typename T>
+T parallel_accumulate(Iterator first, Iterator last, T init)
+{
+    unsigned long const length = std::distance(first, last);
+    if (!length)
+        return init;
 
+    unsigned long const min_per_thread = 100000;
+    unsigned long const max_threads = (length + min_per_thread - 1) / min_per_thread;
 
+    unsigned long const hardware_threads = std::thread::hardware_concurrency();
 
+    unsigned long const num_threads = std::min(hardware_threads != 0 ? hardware_threads : 2, max_threads);
 
+    unsigned long const block_size = length / num_threads;
+
+    std::vector<std::future<T>> futures(num_threads - 1);
+    std::vector<std::thread> threads(num_threads - 1);
+    join_threads joiner(threads);
+
+    Iterator block_start = first;
+
+    for (unsigned long i = 0; i < (num_threads - 1); ++i)
+    {
+        Iterator block_end = block_start;
+        std::advance(block_end, block_size);
+        std::packaged_task<T(Iterator, Iterator)> task(accumulate_block<Iterator, T>);
+        futures[i] = task.get_future();
+
+        threads[i] = std::thread(std::move(task), block_start, block_end);
+        block_start = block_end;
+    }
+    T last_result = accumulate_block<Iterator, T>(block_start, last);
+    T result = init;
+    for (unsigned long i = 0; i < (num_threads - 1); ++i)
+    {
+        result += futures[i].get();
+    }
+    result += last_result;
+    return result;
+}
+
+//递归划分数据 运行时间不稳定
+template<typename Iterator, typename T>
+T parallel_accumulate_r(Iterator first, Iterator last, T init)
+{
+    unsigned long const length = std::distance(first, last);
+    if (!length)
+        return init;
+
+    unsigned long const max_chunk_size = 100000;
+    if (length <= max_chunk_size)
+    {
+        return std::accumulate(first, last, init);
+    }
+    else
+    {
+        Iterator mid_point = first + length / 2;
+        std::future<T> first_half_result = std::async(parallel_accumulate_r<Iterator, T>, first, mid_point, init);
+
+        T second_half_result = parallel_accumulate_r(mid_point, last, T());
+        return first_half_result.get() + second_half_result;
+    }
+}
+
+/*
+** std::for_each 并行版本
+*/
+template<typename Iterator, typename Func>
+void parallel_for_each(Iterator first, Iterator last, Func f)
+{
+    unsigned long const length = std::distance(first, last);
+    if (!length)
+        return;
+
+    unsigned long const min_per_thread = 100000;
+    unsigned long const max_threads = (length + min_per_thread - 1) / min_per_thread;
+
+    unsigned long const hardware_threads = std::thread::hardware_concurrency();
+
+    unsigned long const num_threads = std::min(hardware_threads != 0 ? hardware_threads : 2, max_threads);
+
+    unsigned long const block_size = length / num_threads;
+
+    std::vector<std::future<void>> futures(num_threads - 1);
+    std::vector<std::thread> threads(num_threads - 1);
+    join_threads joiner(threads);
+
+    Iterator block_start = first;
+
+    for (unsigned long i = 0; i < (num_threads - 1); ++i)
+    {
+        Iterator block_end = block_start;
+        std::advance(block_end, block_size);
+        std::packaged_task<void(void)> task(
+            [=]()
+            {
+                std::for_each(block_start, block_end, f);
+            });
+        futures[i] = task.get_future();
+        threads[i] = std::thread(std::move(task));
+        block_start = block_end;
+    }
+
+    std::for_each(block_start, last, f);
+    for(unsigned long i = 0; i < (num_threads - 1); ++i)
+    {
+        futures[i].get();
+    }
+}
+
+//递归划分数据 运行时间不稳定
+template<typename Iterator, typename Func>
+void parallel_for_each_r(Iterator first, Iterator last, Func f)
+{
+    unsigned long const length = std::distance(first, last);
+    if (!length)
+        return;
+
+    unsigned long const max_chunk_size = 100000;
+    if (length <= max_chunk_size)
+    {
+        std::for_each(first, last, f);
+    }
+    else
+    {
+        Iterator const mid_point = first + length / 2;
+        std::future<void> first_half = std::async(parallel_for_each_r<Iterator, Func>, first, mid_point, f);
+        parallel_for_each_r(mid_point, last, f);
+        first_half.get();
+    }
+}
 
