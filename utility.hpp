@@ -438,3 +438,5 @@ void parallel_for_each_r(Iterator first, Iterator last, Func f)
     }
 }
 
+//编码转换
+void TransCoding(const char* from_code, const char* to_code, const std::string& in, std::string& out);

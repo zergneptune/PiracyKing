@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <sys/time.h>
+#include <iconv.h>
 
 using std::cin;
 using std::cout;
@@ -245,4 +246,43 @@ std::string get_input_string()
     }
 
     return strInput;
+}
+
+static int Convert(const char* from_type, const char* to_type,
+    const char* src, int src_length, char* dest, int dest_length)
+{
+    char* in = const_cast<char*>(src);
+    char* out = dest;
+    size_t insize = src_length;
+    size_t outsize = dest_length;
+    iconv_t conv = iconv_open(to_type, from_type);
+    if (conv == (iconv_t)-1)
+    {
+        return -1;
+    }
+
+    size_t ret = iconv(conv, &in, &insize, &out, &outsize);
+    if (ret == (size_t)-1)
+    {
+        iconv_close(conv);
+        return -1;
+    }
+
+    iconv_close(conv);
+    return dest_length - outsize;
+}
+
+//to_code//IGNORE  to_code//TRANSLIT
+void TransCoding(const char* from_code, const char* to_code, const std::string& in, std::string& out)
+{
+    if (in.empty())
+    {
+        return;
+    }
+    
+    int in_size = in.size() + 1;
+    char* new_out = new char[2 * in_size];
+    Convert(from_code, to_code, in.c_str(), in_size, new_out, 2 * in_size);
+    out.assign(new_out);
+    delete[] new_out;
 }
