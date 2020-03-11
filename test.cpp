@@ -13,6 +13,12 @@
 #include <unistd.h>
 #include "practice.hpp"
 #include "utility.hpp"
+//geos
+#include <geos.h>
+#include <geos/geom/GeometryFactory.h>
+using namespace geos::geom;
+using namespace geos::io;
+GeometryFactory global_factory;
 /*-----------------------*/
 #define HAS_MEMBER(member)\
 template<typename T, typename... Args>struct has_member_##member\
@@ -139,7 +145,7 @@ public:
                 switch(value)
                 {
                     case MapType::BORDER:
-                        printf("\033[30m*\033[m");
+                        printf("%s*\033[m", BLUE);
                         break;
                     case MapType::SNAKE:
                         printf("%s@\033[m", snake_color.c_str());
@@ -642,26 +648,14 @@ void thread_func(CSnowFlake* p)
 
 int main(int argc, char const *argv[])
 {
-	/*
-	cout<< has_member_foo11<MyStruct>::value << endl;
-	cout<< has_member_foo11<MyStruct, int>::value << endl;
-	cout<< has_member_foo11<MyStruct, double>::value << endl;
-	cout << factorial<5>::value << endl;  // constexpr (no calculations on runtime)
-	static_assert(has_member_foo11<MyStruct>::value, "MyStruct has foo");
-	static_assert(has_member_foo11<MyStruct, int>::value, "MyStruct has foo");
-
-	cout << std::boolalpha;
-	cout << "is_same:" << std::endl;
-	cout << "int, const int: " << std::is_same<int, const int>::value << std::endl;
-	cout << "int, integer_type: " << std::is_same<int, integer_type>::value << std::endl;
-	cout << "A, B: " << std::is_same<A,B>::value << std::endl;
-	cout << "A, C: " << std::is_same<A,C>::value << std::endl;
-	cout << "signed char, std::int8_t: " << std::is_same<signed char,std::int8_t>::value << std::endl;
-	*/
-    /*CGame game;
+    (void)argc;
+    (void)argv;
+    /*
+    CGame game;
     game.init();
-    game.start();*/
-    CSnowFlake  snowflake(0);
+    game.start();
+    */
+    /*CSnowFlake  snowflake(0);
     std::vector<std::thread> v;
     for(int i = 0; i < 4; ++ i)
     {
@@ -670,6 +664,79 @@ int main(int argc, char const *argv[])
 
     std::for_each(v.begin(), v.end(), [](std::thread& th){
         th.join();
-    });
+    });*/
+    const char* wkt = "0101000000377B527C740C6941BB373F01A4F85241";
+    /*
+    GEOSWKTReader* reader = GEOSWKTReader_create();
+    if (!reader)
+    {
+        std::cout << "reader empty" << std::endl;
+        return 0;
+    }
+    GEOSGeometry* geo = GEOSWKTReader_read(reader, wkt);
+    GEOSWKTReader_destroy(reader);
+    if (GEOSisEmpty(geo))
+    {
+        std::cout << "isEmpty" << std::endl;
+    }
+    */
+    Coordinate coo(13132707.8850685, 4973200.0194835);
+    auto point = global_factory.createPoint(coo);
+    if (point->isEmpty())
+    {
+        std::cout << "empty point" << std::endl;
+        return 0;
+    }
+
+    if (point->isSimple())
+    {
+        std::cout << "is simple point" << std::endl;
+    }
+
+    std::cout << "the num of point is " << point->getNumPoints() << std::endl;
+    std::cout << "the point is " << point->getCoordinateDimension() << " dimension coordinate" << std::endl;
+    std::cout << "x: " << point->getX() << " y: " << point->getY() << std::endl;
+    std::cout << "string : " << point->toString() << std::endl;
+    std::cout << "SRID : " << point->getSRID() << std::endl;
+    WKBWriter wkb_writer;
+    WKTWriter wkt_writer;
+    std::ostringstream ostr;
+    wkb_writer.writeHEX(*point, ostr);
+    std::string wkt_str = wkt_writer.write(point);
+    std::cout << "WKB hex : " << ostr.str() << std::endl;
+    std::cout << "WKT string : " << wkt_str << std::endl;
+
+    WKBReader wkb_reader;
+    std::istringstream istr(ostr.str());
+    istr.str("0101000000377B527C740C6941BB373F01A4F85241");
+    auto ret_geo = wkb_reader.readHEX(istr);
+    std::cout << "return geo is " << ret_geo->toString() << std::endl;
+
+    std::vector<std::string> vec_wkb_hex{
+        "0101000000377B527C740C6941BB373F01A4F85241",
+        "010100000010A8CC241F0B69410C1F34E53F015341",
+        "01010000002BCB0E9F1D0B6941E5039AC61C005341",
+        "0101000000D623E7F6F40A6941501DC8FA54015341",
+        "010100000084F6F671830A6941783C0869AC015341",
+        "010100000000000020FF0B6941000000C0A0045341",
+        "0101000000666666566E1669419A999959B69F5341",
+        "010100000000000000310B6941000000605A055341",
+        "01010000002FE97246010C6941D795BE2B26FA5241",
+        "0101000000000000C0DD16694100000060B8A05341"
+    };
+    int i = 0;
+
+    for (const auto& wkb_hex : vec_wkb_hex)
+    {
+        istr.clear();
+        istr.str(wkb_hex);
+        std::cout << "wkb_hex = " << istr.str() << std::endl;
+        auto res_geo = wkb_reader.readHEX(istr);
+        std::cout << ++i << " return SRID " << res_geo->getSRID() << " geo is " << res_geo->toString() << std::endl;
+    }
     return 0;
+
+
+
+
 }
