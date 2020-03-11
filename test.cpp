@@ -733,6 +733,8 @@ int main(int argc, char const *argv[])
         std::cout << "wkb_hex = " << istr.str() << std::endl;
         auto res_geo = wkb_reader.readHEX(istr);
         std::cout << ++i << " return SRID " << res_geo->getSRID() << " geo is " << res_geo->toString() << std::endl;
+        const auto coo = res_geo->getCoordinate();
+        std::cout << "x: " << coo->x << " y: " << coo->y << std::endl;
     }
     return 0;
 
