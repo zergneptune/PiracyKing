@@ -2,6 +2,7 @@
 #include <stack>
 #include <stdarg.h>
 #include <unistd.h>
+#include <string.h>
 using std::stack;
 // test5
 int jump(int row, int col)

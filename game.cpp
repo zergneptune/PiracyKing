@@ -1,6 +1,7 @@
 #include "game.hpp"
 #include <thread>
 #include <stdio.h>
+#include <string.h>
 #include <termios.h>
 #include <sys/socket.h>
 #include <arpa/inet.h>
@@ -646,13 +647,13 @@ std::string CGameServer::get_gameid_list()
     std::lock_guard<std::mutex> lck(m_mtx);
     for(auto iter = m_mapGame.begin(); iter != m_mapGame.end(); ++ iter)
     {
-        value["gid"] = iter->first;
+        value["gid"] = Json::Value::UInt64(iter->first);
         value["gname"] = iter->second->get_name();
         value["players"] = iter->second->get_client_nums();
         root.append(value);
     }
 
-    if(root)
+    if(!root.empty())
     {
         return fwriter.write(root);
     }

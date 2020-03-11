@@ -213,8 +213,8 @@ int get_input_number()
         if (!cin.good())
         {
             cout << "输入错误，请重新输入: ";
-            //cin.clear(); 清空输入流状态位
-            cin.clear(cin.rdstate() & ~cin.failbit & ~cin.badbit & !cin.goodbit & !cin.eofbit);
+            cin.clear(); //清空输入流状态位
+            //cin.clear(cin.rdstate() & ~cin.failbit & ~cin.badbit & !cin.goodbit & !cin.eofbit);
             cin.ignore(128, '\n');
         }
         else
@@ -235,8 +235,8 @@ std::string get_input_string()
         if (!cin.good())
         {
             cout << "输入错误，请重新输入: ";
-            //cin.clear(); 清空输入流状态位
-            cin.clear(cin.rdstate() & ~cin.failbit & ~cin.badbit & !cin.goodbit & !cin.eofbit);
+            cin.clear(); //清空输入流状态位
+            //cin.clear(cin.rdstate() & ~cin.failbit & ~cin.badbit & !cin.goodbit & !cin.eofbit);
             cin.ignore(128, '\n');
         }
         else

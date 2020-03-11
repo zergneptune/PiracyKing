@@ -7,6 +7,7 @@
 #include <errno.h>
 #include <iterator>
 #include <json/json.h>
+#include <string.h>
 #include "game.hpp"
 
 using namespace std;
@@ -1009,7 +1010,7 @@ void CServerMng::do_create_room(std::shared_ptr<TTaskData>& pTask)
         else
         {
             root["res"] = 0;
-            root["gid"] = gid;
+            root["gid"] = Json::Value::UInt64(gid);
             root["gname"] = strRoomName;
             root["room_owner"] = cid;
         }
