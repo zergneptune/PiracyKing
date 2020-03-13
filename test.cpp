@@ -685,6 +685,8 @@ int main(int argc, char const *argv[])
     std::cout << "x: " << point->getX() << " y: " << point->getY() << std::endl;
     std::cout << "string : " << point->toString() << std::endl;
     std::cout << "SRID : " << point->getSRID() << std::endl;
+
+    //WKT WKB转换
     WKBWriter wkb_writer;
     WKTWriter wkt_writer;
     std::ostringstream ostr;
@@ -714,12 +716,12 @@ int main(int argc, char const *argv[])
 
     int i = 0;
     std::vector<const Coordinate*> vec_coo;
-    std::vector<Geometry*> vec_geo;
+    std::vector<const Geometry*> vec_geo;
     for (const auto& wkb_hex : vec_wkb_hex)
     {
         istr.clear();
         istr.str(wkb_hex);
-        auto res_geo = wkb_reader.readHEX(istr);
+        const auto res_geo = wkb_reader.readHEX(istr);
         std::cout << ++i << " geo is " << res_geo->toString() << std::endl;
         std::cout << "GeometryTypeId = " << res_geo->getGeometryTypeId() << " GeometryType = " << res_geo->getGeometryType() << std::endl;
         const auto coo = res_geo->getCoordinate();
@@ -730,18 +732,26 @@ int main(int argc, char const *argv[])
 
     //计算距离
     std::cout << "distance = " << vec_coo[0]->distance(*vec_coo[1]) << std::endl;
+    std::cout << "distance = " << vec_geo[0]->distance(vec_geo[1]) << std::endl;
 
 
 
     //buffer
-    BufferParameters buffer_param(8);
+    BufferParameters buffer_param(8);//quadrant segments is 8(default)
     BufferBuilder buffer_builder(buffer_param);
-    Geometry* geo_buffer = buffer_builder.buffer(vec_geo[0], 10000);
+    std::unique_ptr<const Geometry> geo_buffer(buffer_builder.buffer(vec_geo[0], 9300));
     if (geo_buffer->intersects(vec_geo[1]))
     {
         std::cout << "geo_buffer intersects the geo!" << std::endl;
     }
 
+    //BufferBuilder不能重复用 BufferParameters可以
+    BufferBuilder buffer_builder_2(buffer_param);
+    std::unique_ptr<const Geometry> geo_buffer_2(buffer_builder_2.buffer(vec_geo[0], 9300));
+    if (geo_buffer_2->intersects(vec_geo[1]))
+    {
+        std::cout << "geo_buffer intersects the geo!" << std::endl;
+    }
 
     if (!point)
     {
@@ -772,12 +782,13 @@ int main(int argc, char const *argv[])
         delete ret_geo;
         ret_geo = nullptr;
     }
-
+/*
     if (!geo_buffer)
     {
         delete geo_buffer;
         geo_buffer = nullptr;
     }
+    */
 
     
     return 0;
