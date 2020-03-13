@@ -16,8 +16,10 @@
 //geos
 #include <geos.h>
 #include <geos/geom/GeometryFactory.h>
+#include <geos/operation/buffer/BufferBuilder.h>
 using namespace geos::geom;
 using namespace geos::io;
+using namespace geos::operation::buffer;
 GeometryFactory global_factory;
 /*-----------------------*/
 #define HAS_MEMBER(member)\
@@ -665,21 +667,6 @@ int main(int argc, char const *argv[])
     std::for_each(v.begin(), v.end(), [](std::thread& th){
         th.join();
     });*/
-    const char* wkt = "0101000000377B527C740C6941BB373F01A4F85241";
-    /*
-    GEOSWKTReader* reader = GEOSWKTReader_create();
-    if (!reader)
-    {
-        std::cout << "reader empty" << std::endl;
-        return 0;
-    }
-    GEOSGeometry* geo = GEOSWKTReader_read(reader, wkt);
-    GEOSWKTReader_destroy(reader);
-    if (GEOSisEmpty(geo))
-    {
-        std::cout << "isEmpty" << std::endl;
-    }
-    */
     Coordinate coo(13132707.8850685, 4973200.0194835);
     auto point = global_factory.createPoint(coo);
     if (point->isEmpty())
@@ -724,18 +711,75 @@ int main(int argc, char const *argv[])
         "01010000002FE97246010C6941D795BE2B26FA5241",
         "0101000000000000C0DD16694100000060B8A05341"
     };
-    int i = 0;
 
+    int i = 0;
+    std::vector<const Coordinate*> vec_coo;
+    std::vector<Geometry*> vec_geo;
     for (const auto& wkb_hex : vec_wkb_hex)
     {
         istr.clear();
         istr.str(wkb_hex);
-        std::cout << "wkb_hex = " << istr.str() << std::endl;
         auto res_geo = wkb_reader.readHEX(istr);
-        std::cout << ++i << " return SRID " << res_geo->getSRID() << " geo is " << res_geo->toString() << std::endl;
+        std::cout << ++i << " geo is " << res_geo->toString() << std::endl;
+        std::cout << "GeometryTypeId = " << res_geo->getGeometryTypeId() << " GeometryType = " << res_geo->getGeometryType() << std::endl;
         const auto coo = res_geo->getCoordinate();
         std::cout << "x: " << coo->x << " y: " << coo->y << std::endl;
+        vec_geo.emplace_back(res_geo);
+        vec_coo.emplace_back(coo);
     }
+
+    //计算距离
+    std::cout << "distance = " << vec_coo[0]->distance(*vec_coo[1]) << std::endl;
+
+
+
+    //buffer
+    BufferParameters buffer_param(8);
+    BufferBuilder buffer_builder(buffer_param);
+    Geometry* geo_buffer = buffer_builder.buffer(vec_geo[0], 10000);
+    if (geo_buffer->intersects(vec_geo[1]))
+    {
+        std::cout << "geo_buffer intersects the geo!" << std::endl;
+    }
+
+
+    if (!point)
+    {
+        delete point;
+        point = nullptr;
+    }
+
+    for (auto p_geo : vec_geo)
+    {
+       if (!p_geo)
+       {
+           delete p_geo;
+           p_geo = nullptr;
+       }
+    }
+
+    for (auto p_coo : vec_coo)
+    {
+       if (!p_coo)
+       {
+           delete p_coo;
+           p_coo = nullptr;
+       }
+    }
+
+    if (!ret_geo)
+    {
+        delete ret_geo;
+        ret_geo = nullptr;
+    }
+
+    if (!geo_buffer)
+    {
+        delete geo_buffer;
+        geo_buffer = nullptr;
+    }
+
+    
     return 0;
 
 
