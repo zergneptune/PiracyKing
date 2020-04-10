@@ -1494,10 +1494,10 @@ int main()
 {
 	string IP("127.0.0.1");
 	int port = 10086;
-	//std::cout<< "请输入ip: ";
-	//cin>>IP;
-	//std::cout<< "请输入port: ";
-	//cin>>port;
+	std::cout<< "请输入ip: ";
+	cin>>IP;
+	std::cout<< "请输入port: ";
+	cin>>port;
 	//connect_server(IP.c_str(), port);
 
     CClientMng clientMng;
