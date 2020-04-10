@@ -3,7 +3,23 @@
 #include <stdarg.h>
 #include <unistd.h>
 #include <string.h>
+#include <sstream>
+#include "utility.hpp"
 using std::stack;
+//geos
+#include <geos.h>
+#include <geos/geom/GeometryFactory.h>
+#include <geos/operation/buffer/BufferBuilder.h>
+#include <geos/index/quadtree/Quadtree.h>
+using namespace geos::geom;
+using namespace geos::io;
+using namespace geos::operation::buffer;
+using namespace geos::index::quadtree;
+GeometryFactory global_factory;
+
+//curses
+#include <curses.h>
+
 // test5
 int jump(int row, int col)
 {
@@ -518,4 +534,232 @@ void printf_format()
     printf("\033[5;31m红,闪烁\033[m\n");
     printf("\033[7;31m红,反显\033[m\n");
     printf("\033[8;31m红,消隐\033[m\n");
+}
+
+void test_geo()
+{
+    Coordinate coo(13132707.8850685, 4973200.0194835);
+    auto point = global_factory.createPoint(coo);
+    if (point->isEmpty())
+    {
+        std::cout << "empty point" << std::endl;
+        return;
+    }
+
+    if (point->isSimple())
+    {
+        std::cout << "is simple point" << std::endl;
+    }
+
+    std::cout << "the num of point is " << point->getNumPoints() << std::endl;
+    std::cout << "the point is " << point->getCoordinateDimension() << " dimension coordinate" << std::endl;
+    std::cout << "x: " << point->getX() << " y: " << point->getY() << std::endl;
+    std::cout << "string : " << point->toString() << std::endl;
+    std::cout << "SRID : " << point->getSRID() << std::endl;
+
+    //WKT WKB转换
+    WKBWriter wkb_writer;
+    WKTWriter wkt_writer;
+    std::ostringstream ostr;
+    wkb_writer.writeHEX(*point, ostr);
+    std::string wkt_str = wkt_writer.write(point);
+    std::cout << "WKB hex : " << ostr.str() << std::endl;
+    std::cout << "WKT string : " << wkt_str << std::endl;
+
+    WKBReader wkb_reader;
+    std::istringstream istr(ostr.str());
+    istr.str("0101000000377B527C740C6941BB373F01A4F85241");
+    auto ret_geo = wkb_reader.readHEX(istr);
+    std::cout << "return geo is " << ret_geo->toString() << std::endl;
+
+    std::vector<std::string> vec_wkb_hex{
+        "0101000000377B527C740C6941BB373F01A4F85241",
+        "010100000010A8CC241F0B69410C1F34E53F015341",
+        "01010000002BCB0E9F1D0B6941E5039AC61C005341",
+        "0101000000D623E7F6F40A6941501DC8FA54015341",
+        "010100000084F6F671830A6941783C0869AC015341",
+        "010100000000000020FF0B6941000000C0A0045341",
+        "0101000000666666566E1669419A999959B69F5341",
+        "010100000000000000310B6941000000605A055341",
+        "01010000002FE97246010C6941D795BE2B26FA5241",
+        "0101000000000000C0DD16694100000060B8A05341"
+    };
+
+    int i = 0;
+    std::vector<const Coordinate*> vec_coo;
+    std::vector<Geometry*> vec_geo;
+    for (const auto& wkb_hex : vec_wkb_hex)
+    {
+        istr.clear();
+        istr.str(wkb_hex);
+        auto res_geo = wkb_reader.readHEX(istr);
+        std::cout << ++i << " geo is " << res_geo->toString() << std::endl;
+        std::cout << "GeometryTypeId = " << res_geo->getGeometryTypeId() << " GeometryType = " << res_geo->getGeometryType() << std::endl;
+        const auto coo = res_geo->getCoordinate();
+        std::cout << "x: " << coo->x << " y: " << coo->y << std::endl;
+        vec_geo.emplace_back(res_geo);
+        vec_coo.emplace_back(coo);
+    }
+
+    //计算距离
+    std::cout << "distance = " << vec_coo[0]->distance(*vec_coo[1]) << std::endl;
+    std::cout << "distance = " << vec_geo[0]->distance(vec_geo[1]) << std::endl;
+
+
+    //buffer
+    BufferParameters buffer_param(8);//quadrant segments is 8(default)
+    BufferBuilder buffer_builder(buffer_param);
+    std::unique_ptr<const Geometry> geo_buffer(buffer_builder.buffer(vec_geo[0], 9300));
+    if (geo_buffer->intersects(vec_geo[1]))
+    {
+        std::cout << "geo_buffer intersects the geo!" << std::endl;
+    }
+
+    //BufferBuilder不能重复用 BufferParameters可以
+    BufferBuilder buffer_builder_2(buffer_param);
+    std::unique_ptr<const Geometry> geo_buffer_2(buffer_builder_2.buffer(vec_geo[0], 9300));
+    if (geo_buffer_2->intersects(vec_geo[1]))
+    {
+        std::cout << "geo_buffer intersects the geo!" << std::endl;
+    }
+
+    for (const auto& p_geo : vec_geo)
+    {
+        std::cout << "geo_buffer distance to geo " << p_geo << " = " << p_geo->distance(geo_buffer.get()) << std::endl;
+    }
+
+    //构建四插树空间索引
+    Quadtree quad_tree;
+    for (auto p_geo : vec_geo)
+    {
+        auto p_envel = p_geo->getEnvelopeInternal();
+        quad_tree.insert(p_envel, static_cast<void*>(p_geo));
+    }
+    std::cout << "the depth of quadtree is " << quad_tree.depth() << std::endl;
+    std::cout << "the size of quadtree is " << quad_tree.size() << std::endl;
+
+    Envelope search_envel(*geo_buffer->getEnvelopeInternal());
+    std::vector<void*> vec_ret;
+    quad_tree.query(&search_envel, vec_ret);
+    std::cout << "the size of vec_ret is " << vec_ret.size() << std::endl;
+    for (auto p_void : vec_ret)
+    {
+        const auto p_geo = static_cast<Geometry*>(p_void);
+        if (p_geo)
+        {
+            //std::cout << "return geo = " << p_geo << " distance = " << p_geo->distance(geo_buffer.get()) << std::endl;
+            std::cout << "return geo = " << p_geo << " distance = " << p_geo->distance(vec_geo[0]) << std::endl;
+        }
+    }
+
+    CalcTimeFuncInvoke(
+        for (int i = 0; i < 1000000; ++i)
+        {
+            WKBReader wkb_reader;
+            std::istringstream istr(ostr.str());
+            istr.str("0101000000377B527C740C6941BB373F01A4F85241");
+            auto ret_geo = wkb_reader.readHEX(istr);
+        },
+        "wkb_reader 100w"
+    );
+    
+    if (!point)
+    {
+        delete point;
+        point = nullptr;
+    }
+
+    for (auto p_geo : vec_geo)
+    {
+       if (!p_geo)
+       {
+           delete p_geo;
+           p_geo = nullptr;
+       }
+    }
+
+    for (auto p_coo : vec_coo)
+    {
+       if (!p_coo)
+       {
+           delete p_coo;
+           p_coo = nullptr;
+       }
+    }
+
+    if (!ret_geo)
+    {
+        delete ret_geo;
+        ret_geo = nullptr;
+    }
+
+}
+
+void initial()
+{
+    initscr();                    //开启curses模式
+ 
+    cbreak();                     //开启cbreak模式，除 DELETE 或 CTRL 等仍被视为特殊控制字元外一切输入的字元将立刻被一一读取
+ 
+    nonl();                       //用来决定当输入资料时，按下 RETURN 键是否被对应为 NEWLINE 字元
+ 
+    noecho();                     //echo() and noecho(): 此函式用来控制从键盘输入字元时是否将字元显示在终端机上
+ 
+    intrflush(stdscr,false);
+ 
+    keypad(stdscr,true);          //当开启 keypad 後, 可以使用键盘上的一些特殊字元, 如上下左右>等方向键
+ 
+    refresh();                    //将做清除萤幕的工作
+}
+
+void test_curses()
+{
+  	initscr();
+ 
+    box(stdscr, ACS_VLINE, ACS_HLINE); /*draw a box*/
+
+    move(LINES/2, COLS/2); /*move the cursor to the center*/
+ 
+    waddstr(stdscr, "Hello, world!");
+ 
+    refresh();
+ 
+    getch();
+ 
+    endwin();  
+}
+
+void test_curses2()
+{
+    initscr(); /*初始化屏幕*/
+    box(stdscr, '*', '*'); /*draw a box*/
+    move(LINES/2, COLS/2);
+ 
+    if(start_color() == OK) /*开启颜色*/
+    {
+     
+        init_pair(1, COLOR_RED, COLOR_GREEN); /*建立一个颜色对*/
+     
+		attron(COLOR_PAIR(1)); /*开启字符输出颜色*/
+	 
+		waddstr(stdscr, "Yet another Hello, world!");
+			 
+		attroff(COLOR_PAIR(1)); /*关闭颜色显示*/
+			 
+		refresh();
+			 
+		getch();
+	}
+	else
+	{
+			 
+		waddstr(stdscr, "Can not init color");
+				 
+		refresh();
+				 
+		getch();
+		 
+	}
+		 
+	endwin(); /*关闭curses状态*/
 }

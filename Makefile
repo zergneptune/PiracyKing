@@ -8,7 +8,7 @@ OBJ4 = game.o
 OBJ5 = utility.o
 
 test : $(OBJ1) $(OBJ5)
-	g++ $(OBJ1) $(OBJ5) -lpthread -lgeos -o test
+	g++ $(OBJ1) $(OBJ5) -lcurses -lpthread -lgeos -o test
 server : $(OBJ2) $(OBJ4) $(OBJ5)
 	g++ $(OBJ2) $(OBJ4) $(OBJ5) -lpthread -ljsoncpp -o server
 client : $(OBJ3) $(OBJ4) $(OBJ5)

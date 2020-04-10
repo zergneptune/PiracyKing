@@ -229,3 +229,8 @@ char * get_program_name(char *buf,int count);
 void test_keyboard_input();
 
 void printf_format();
+
+void test_geo();
+
+void test_curses();
+void test_curses2();

@@ -72,6 +72,8 @@ private:
 private:
 	int             m_nKq;
 
+    int             m_nEpfd;
+
     int             m_nServerSockfd;
 
     int 			m_nClientID;

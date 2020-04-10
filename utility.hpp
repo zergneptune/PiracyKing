@@ -348,8 +348,8 @@ T parallel_accumulate(Iterator first, Iterator last, T init)
 }
 
 //递归划分数据 运行时间不稳定
-template<typename Iterator, typename T>
-T parallel_accumulate_r(Iterator first, Iterator last, T init)
+template<typename Iterator, typename T, typename Func>
+T parallel_accumulate_r(Iterator first, Iterator last, T init, Func func)
 {
     unsigned long const length = std::distance(first, last);
     if (!length)
@@ -358,7 +358,7 @@ T parallel_accumulate_r(Iterator first, Iterator last, T init)
     unsigned long const max_chunk_size = 100000;
     if (length <= max_chunk_size)
     {
-        return std::accumulate(first, last, init);
+        return std::accumulate(first, last, init, func());
     }
     else
     {
@@ -440,3 +440,12 @@ void parallel_for_each_r(Iterator first, Iterator last, Func f)
 
 //编码转换
 void TransCoding(const char* from_code, const char* to_code, const std::string& in, std::string& out);
+
+//计算语句调用花费的时间宏
+#define CalcTimeFuncInvoke(invoke, desc) {\
+    auto start = std::chrono::steady_clock::now();\
+    invoke;\
+    auto end = std::chrono::steady_clock::now();\
+    auto time_span = std::chrono::duration_cast<std::chrono::duration<double>>(end - start);\
+	std::cout << desc << " cost " << time_span.count() << "s" << std::endl;\
+}

@@ -13,15 +13,15 @@
 #include <unistd.h>
 #include "practice.hpp"
 #include "utility.hpp"
-//geos
-#include <geos.h>
-#include <geos/geom/GeometryFactory.h>
-#include <geos/operation/buffer/BufferBuilder.h>
-using namespace geos::geom;
-using namespace geos::io;
-using namespace geos::operation::buffer;
-GeometryFactory global_factory;
 /*-----------------------*/
+#define CalcTimeFuncInvoke(invoke, desc) {\
+    auto start = std::chrono::steady_clock::now();\
+    invoke;\
+    auto end = std::chrono::steady_clock::now();\
+    auto time_span = std::chrono::duration_cast<std::chrono::duration<double>>(end - start);\
+	std::cout << desc << " cost " << time_span.count() << "s" << std::endl;\
+}
+
 #define HAS_MEMBER(member)\
 template<typename T, typename... Args>struct has_member_##member\
 {\
@@ -667,133 +667,8 @@ int main(int argc, char const *argv[])
     std::for_each(v.begin(), v.end(), [](std::thread& th){
         th.join();
     });*/
-    Coordinate coo(13132707.8850685, 4973200.0194835);
-    auto point = global_factory.createPoint(coo);
-    if (point->isEmpty())
-    {
-        std::cout << "empty point" << std::endl;
-        return 0;
-    }
 
-    if (point->isSimple())
-    {
-        std::cout << "is simple point" << std::endl;
-    }
+    test_geo();
 
-    std::cout << "the num of point is " << point->getNumPoints() << std::endl;
-    std::cout << "the point is " << point->getCoordinateDimension() << " dimension coordinate" << std::endl;
-    std::cout << "x: " << point->getX() << " y: " << point->getY() << std::endl;
-    std::cout << "string : " << point->toString() << std::endl;
-    std::cout << "SRID : " << point->getSRID() << std::endl;
-
-    //WKT WKB转换
-    WKBWriter wkb_writer;
-    WKTWriter wkt_writer;
-    std::ostringstream ostr;
-    wkb_writer.writeHEX(*point, ostr);
-    std::string wkt_str = wkt_writer.write(point);
-    std::cout << "WKB hex : " << ostr.str() << std::endl;
-    std::cout << "WKT string : " << wkt_str << std::endl;
-
-    WKBReader wkb_reader;
-    std::istringstream istr(ostr.str());
-    istr.str("0101000000377B527C740C6941BB373F01A4F85241");
-    auto ret_geo = wkb_reader.readHEX(istr);
-    std::cout << "return geo is " << ret_geo->toString() << std::endl;
-
-    std::vector<std::string> vec_wkb_hex{
-        "0101000000377B527C740C6941BB373F01A4F85241",
-        "010100000010A8CC241F0B69410C1F34E53F015341",
-        "01010000002BCB0E9F1D0B6941E5039AC61C005341",
-        "0101000000D623E7F6F40A6941501DC8FA54015341",
-        "010100000084F6F671830A6941783C0869AC015341",
-        "010100000000000020FF0B6941000000C0A0045341",
-        "0101000000666666566E1669419A999959B69F5341",
-        "010100000000000000310B6941000000605A055341",
-        "01010000002FE97246010C6941D795BE2B26FA5241",
-        "0101000000000000C0DD16694100000060B8A05341"
-    };
-
-    int i = 0;
-    std::vector<const Coordinate*> vec_coo;
-    std::vector<const Geometry*> vec_geo;
-    for (const auto& wkb_hex : vec_wkb_hex)
-    {
-        istr.clear();
-        istr.str(wkb_hex);
-        const auto res_geo = wkb_reader.readHEX(istr);
-        std::cout << ++i << " geo is " << res_geo->toString() << std::endl;
-        std::cout << "GeometryTypeId = " << res_geo->getGeometryTypeId() << " GeometryType = " << res_geo->getGeometryType() << std::endl;
-        const auto coo = res_geo->getCoordinate();
-        std::cout << "x: " << coo->x << " y: " << coo->y << std::endl;
-        vec_geo.emplace_back(res_geo);
-        vec_coo.emplace_back(coo);
-    }
-
-    //计算距离
-    std::cout << "distance = " << vec_coo[0]->distance(*vec_coo[1]) << std::endl;
-    std::cout << "distance = " << vec_geo[0]->distance(vec_geo[1]) << std::endl;
-
-
-
-    //buffer
-    BufferParameters buffer_param(8);//quadrant segments is 8(default)
-    BufferBuilder buffer_builder(buffer_param);
-    std::unique_ptr<const Geometry> geo_buffer(buffer_builder.buffer(vec_geo[0], 9300));
-    if (geo_buffer->intersects(vec_geo[1]))
-    {
-        std::cout << "geo_buffer intersects the geo!" << std::endl;
-    }
-
-    //BufferBuilder不能重复用 BufferParameters可以
-    BufferBuilder buffer_builder_2(buffer_param);
-    std::unique_ptr<const Geometry> geo_buffer_2(buffer_builder_2.buffer(vec_geo[0], 9300));
-    if (geo_buffer_2->intersects(vec_geo[1]))
-    {
-        std::cout << "geo_buffer intersects the geo!" << std::endl;
-    }
-
-    if (!point)
-    {
-        delete point;
-        point = nullptr;
-    }
-
-    for (auto p_geo : vec_geo)
-    {
-       if (!p_geo)
-       {
-           delete p_geo;
-           p_geo = nullptr;
-       }
-    }
-
-    for (auto p_coo : vec_coo)
-    {
-       if (!p_coo)
-       {
-           delete p_coo;
-           p_coo = nullptr;
-       }
-    }
-
-    if (!ret_geo)
-    {
-        delete ret_geo;
-        ret_geo = nullptr;
-    }
-/*
-    if (!geo_buffer)
-    {
-        delete geo_buffer;
-        geo_buffer = nullptr;
-    }
-    */
-
-    
     return 0;
-
-
-
-
 }

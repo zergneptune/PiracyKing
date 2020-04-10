@@ -4,6 +4,7 @@
 #include <unistd.h>
 #include <stdio.h>
 #include <errno.h>
+#include <string.h>
 #include <thread>
 #include <json/json.h>
 #include "game.hpp"
@@ -360,6 +361,7 @@ using namespace std;
 #elif __linux__
     // linux
     #include <sys/epoll.h>
+    #define LISTEN_MAX_NUM 1024
 
     int connect_server(const char* server_ip, int server_port)
     {
@@ -423,6 +425,137 @@ using namespace std;
                 {
                     read(events[i].data.fd, text, 1024);
                     cout << "read from server " << text << endl;
+                }
+            }
+        }
+    }
+
+    int CClientMng::connect_server(string ip, int port)
+    {
+        //创建连接套接字
+        int connfd = socket(AF_INET, SOCK_STREAM, 0);
+        IF_EXIT(connfd < 0, "socket");
+
+        int epfd = epoll_create(5);
+        IF_EXIT(epfd < 0, "socket");
+
+        //设置服务端地址结构
+        struct sockaddr_in serveraddr;
+        bzero(&serveraddr, sizeof(serveraddr));
+        serveraddr.sin_family = AF_INET;
+        serveraddr.sin_addr.s_addr = inet_addr(ip.c_str());
+        serveraddr.sin_port = htons(port);
+
+        //连接
+        int res = connect(connfd, (struct sockaddr*)&serveraddr, sizeof(serveraddr));
+        IF_EXIT(res < 0, "connect");
+
+        //设置为非阻塞
+        setnonblocking(connfd);
+
+        //保存 epoll fd 和 server sockfd
+        m_nEpfd = epfd;
+        m_nServerSockfd = connfd;
+
+        return 0;
+    }
+
+    void CClientMng::socket_send_thread_func()
+    {
+        int nRet = 0;
+        int nSendBufferSize = 0;
+        char* pSendBuffer = NULL;
+        TMsgHead msgHead;
+        for (;;)
+        {
+            shared_ptr<TTaskData> pTask = m_queSendMsg.Wait_GetTask();
+            msgHead.nMsgId = pTask->nTaskId;
+            msgHead.msgType = pTask->msgType;
+            msgHead.szMsgLength = pTask->strMsg.size();
+            nSendBufferSize = sizeof(TMsgHead) + msgHead.szMsgLength;
+            pSendBuffer = new char[nSendBufferSize];
+            memset(pSendBuffer, 0, sizeof(nSendBufferSize));
+            memcpy(pSendBuffer, &msgHead, sizeof(TMsgHead));
+            memcpy(pSendBuffer + sizeof(TMsgHead), pTask->strMsg.c_str(), msgHead.szMsgLength);
+            nRet = writen(pTask->nSockfd, pSendBuffer, nSendBufferSize);
+            if(nRet < 0)
+            {
+                cout << "发送线程：发送数据失败！" << endl;
+            }
+
+            if(pSendBuffer != NULL)
+            {
+                delete[] pSendBuffer;
+                pSendBuffer = NULL;
+            }
+        }
+    }
+
+    void CClientMng::socket_recv_thread_func()
+    {
+        int n_ready = 0;
+        int n_ret = 0;
+        struct epoll_event ev, events[LISTEN_MAX_NUM];
+        auto deleter = [](char* p){
+            if( p != NULL)
+            {
+                delete[] p;
+            }};
+
+        //注册读事件
+        ev.data.fd = m_nServerSockfd;
+        ev.events |= EPOLLIN|EPOLLET;
+        n_ret = epoll_ctl(m_nEpfd, EPOLL_CTL_ADD, m_nServerSockfd, &ev);
+        IF_EXIT(n_ret < 0, "epoll_ctl");
+        for (;;)
+        {
+            //等待事件
+            n_ready = epoll_wait(m_nEpfd, events, LISTEN_MAX_NUM, 500);
+            IF_EXIT(n_ready < 0, "epoll_wait");
+            for(int i = 0; i < n_ready; ++i)
+            {
+                int sockfd = events[i].data.fd;
+
+                if (events[i].events & EPOLLERR)
+                {
+                    cerr << "\r\n与服务器断开连接!" << endl;
+                    close(sockfd); //记得关闭此错误socket文件描述符
+                }
+                else if (events[i].events & EPOLLIN)
+                {
+                    std::shared_ptr<char> pBuffer(new char[sizeof(TMsgHead)], deleter);
+                    n_ret = readn(sockfd, pBuffer.get(), sizeof(TMsgHead));
+                    if(n_ret < 0)
+                    {
+                        cout << "读sockfd失败, errno = " << errno << endl;
+                        struct sockaddr_in serveraddr;
+                        socklen_t addrlen;
+                        getpeername(sockfd, (struct sockaddr*)&serveraddr, &addrlen);
+                        close(sockfd);
+                        continue;
+                    }
+
+                    TMsgHead*   pMsgHead = reinterpret_cast<TMsgHead*>(pBuffer.get());
+                    uint64_t    nTaskId  = pMsgHead->nMsgId;
+                    size_t      szMsgLen = pMsgHead->szMsgLength;
+                    MsgType     msgtype  = pMsgHead->msgType;
+                    pBuffer.reset(new char[szMsgLen + 1], deleter);
+                    memset(pBuffer.get(), 0, szMsgLen + 1);
+                    n_ret = readn(sockfd, pBuffer.get(), szMsgLen);
+                    if(n_ret < 0)
+                    {
+                        cout << "读sockfd失败, errno = " << errno << endl;
+                        close(sockfd);
+                        continue;
+                    }
+
+                    //json解码msg，放入任务队列
+                    cout << "接收到服务器消息: " << pBuffer << endl;
+                    m_queTaskData.AddTask(std::make_shared<TTaskData>(
+                                                    nTaskId,
+                                                    sockfd,
+                                                    msgtype,
+                                                    string(pBuffer.get())));
                 }
             }
         }
@@ -980,7 +1113,7 @@ int CClientMng::quit_room(uint64_t gid)
 {
     Json::Value root;
     Json::FastWriter fwriter;
-    root["gid"] = gid;
+    root["gid"] = Json::Value::UInt64(gid);
     root["cid"] = m_nClientID;
     uint64_t nSid = m_cSnowFlake.get_sid();
     m_queSendMsg.AddTask(make_shared<TTaskData>(
@@ -1040,7 +1173,7 @@ int CClientMng::query_room_players(uint64_t gid, std::string& res)
     uint64_t nSid = m_cSnowFlake.get_sid();
     Json::Value root;
     Json::FastWriter fwriter;
-    root["gid"] = gid;
+    root["gid"] = Json::Value::UInt64(gid);
     m_queSendMsg.AddTask(make_shared<TTaskData>(
                                     nSid,
                                     m_nServerSockfd,
@@ -1065,7 +1198,7 @@ int CClientMng::join_room(uint64_t gid)
     uint64_t nSid = m_cSnowFlake.get_sid();
     Json::Value root;
     Json::FastWriter fwriter;
-    root["gid"] = gid;
+    root["gid"] = Json::Value::UInt64(gid);
     root["cid"] = m_nClientID;
     m_queSendMsg.AddTask(make_shared<TTaskData>(
                                     nSid,
@@ -1102,7 +1235,7 @@ int CClientMng::game_ready(uint64_t gid)
     uint64_t nSid = m_cSnowFlake.get_sid();
     Json::Value root;
     Json::FastWriter fwriter;
-    root["gid"] = gid;
+    root["gid"] = Json::Value::UInt64(gid);
     root["cid"] = m_nClientID;
     m_queSendMsg.AddTask(make_shared<TTaskData>(
                                     nSid,
@@ -1141,7 +1274,7 @@ int CClientMng::quit_game_ready(uint64_t gid)
     uint64_t nSid = m_cSnowFlake.get_sid();
     Json::Value root;
     Json::FastWriter fwriter;
-    root["gid"] = gid;
+    root["gid"] = Json::Value::UInt64(gid);
     root["cid"] = m_nClientID;
     m_queSendMsg.AddTask(make_shared<TTaskData>(
                                     nSid,
@@ -1261,7 +1394,7 @@ int CClientMng::request_start_game(uint64_t gid)
     uint64_t nSid = m_cSnowFlake.get_sid();
     Json::Value root;
     Json::FastWriter fwriter;
-    root["gid"] = gid;
+    root["gid"] = Json::Value::UInt64(gid);
     m_queSendMsg.AddTask(make_shared<TTaskData>(
                                     nSid,
                                     m_nServerSockfd,
@@ -1290,7 +1423,7 @@ int CClientMng::request_start_game(uint64_t gid)
         {
             //发送开始游戏命令
             root.clear();
-            root["gid"] = gid;
+            root["gid"] = Json::Value::UInt64(gid);
             m_queSendMsg.AddTask(make_shared<TTaskData>(
                                         0,
                                         m_nServerSockfd,

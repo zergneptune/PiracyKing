@@ -26,8 +26,7 @@ using namespace std;
     #elif TARGET_OS_IPHONE
         // iOS device
     #elif TARGET_OS_MAC
-        // Other kinds of Mac OS
-        //kqueue
+        // Other kinds of Mac OS //kqueue
         #include <sys/types.h>
         #include <sys/event.h>
         #include <sys/time.h>
@@ -198,11 +197,6 @@ using namespace std;
                     //加入队列
                     m_queSockFD.AddTask(TSocketFD(connfd));
                 }
-                /*else if(event.filter == EVFILT_EXCEPT)
-                {
-                    cerr << "event exception, close it." << endl;
-                    close(sockfd);
-                }*/
             }
         }
 
@@ -401,6 +395,7 @@ using namespace std;
 #elif __linux__
     // linux
     #include <sys/epoll.h>
+    #define LISTEN_MAX_NUM 1024
     #define MAXLINE 1024
     #define OPEN_MAX 100
     #define LISTENQ 20
@@ -526,6 +521,187 @@ using namespace std;
             }
         }
         return 0;
+    }
+
+    void CServerMng::listen_thread_func(int port)
+    {
+        int connfd, nfds;
+        struct epoll_event ev, events[20];
+        struct sockaddr_in clientaddr;
+        struct sockaddr_in serveraddr;
+        socklen_t clilen;
+
+        //生成epoll专用的文件描述符
+        int epfd = epoll_create(256);
+        IF_EXIT(epfd <= 0, "epoll_create");
+     
+        int listenfd = socket(AF_INET, SOCK_STREAM, 0);
+        IF_EXIT(listenfd <= 0, "socket");
+
+        setreuseaddr(listenfd);
+        setnonblocking(listenfd);
+
+        //设置与要处理的事件相关的文件描述符
+        ev.data.fd = listenfd;
+
+        //设置要处理的事件类型
+        ev.events = EPOLLIN|EPOLLET;
+        //ev.events=EPOLLIN;
+
+        //注册epoll事件
+        epoll_ctl(epfd, EPOLL_CTL_ADD, listenfd, &ev);
+
+        bzero(&serveraddr, sizeof(serveraddr));
+        serveraddr.sin_family = AF_INET;
+        serveraddr.sin_addr.s_addr = INADDR_ANY;
+        serveraddr.sin_port = htons(port);
+
+        int res = ::bind(listenfd, (struct sockaddr *)&serveraddr, sizeof(struct sockaddr));
+        IF_EXIT(res < 0, "bind");
+
+        res = listen(listenfd, LISTEN_MAX_NUM);
+        IF_EXIT(res < 0, "listen");
+
+        for (;;)
+        {
+            nfds = epoll_wait(epfd, events, 20, 500);
+            IF_EXIT(nfds < 0, "epoll_wait");
+            for(int i=0;i<nfds;++i)
+            {
+                if(events[i].data.fd==listenfd)//如果新监测到一个SOCKET用户连接到了绑定的SOCKET端口，建立新的连接。
+                {
+                    connfd = accept(listenfd, (sockaddr *)&clientaddr, &clilen);
+                    IF_EXIT(connfd < 0, "accept");
+                    setnonblocking(connfd);
+                    char *str = inet_ntoa(clientaddr.sin_addr);
+                    cout << "有新的连接, ip: " << str << endl;
+
+                    //加入队列
+                    m_queSockFD.AddTask(TSocketFD(connfd));
+                }
+            }
+        }
+    }
+
+    void CServerMng::socket_recv_thread_func()
+    {
+        struct epoll_event ev, events[LISTEN_MAX_NUM];
+        int nfds = 0;
+        int sockfd = 0;
+        int n_ret = 0;
+        TTaskData t_task;
+        TSocketFD t_sockfd;
+
+        int epfd = epoll_create(256);
+        IF_EXIT(epfd <= 0, "epoll_create");
+
+        auto deleter = [](char* p){
+            if( p != NULL)
+            {
+                delete[] p;
+            }};
+
+        for (;;)
+        {
+            nfds = epoll_wait(epfd, events, LISTEN_MAX_NUM, 500);
+            IF_EXIT(nfds < 0, "epoll_wait");
+            
+            for (int i = 0; i < nfds; ++i)
+            {
+                if (events[i].events & EPOLLIN)
+                {
+                    if ((sockfd = events[i].data.fd) < 0)
+                    {
+                        continue;
+                    }
+                    std::shared_ptr<char> pBuffer(new char[sizeof(TMsgHead)], deleter);
+                    n_ret = readn(sockfd, pBuffer.get(), sizeof(TMsgHead));
+                    if(n_ret < 0)
+                    {
+                        cout << "读sockfd失败！errno = " << errno << endl;
+                        close(sockfd);
+                        continue;
+                    }
+
+                    TMsgHead* pMsgHead = reinterpret_cast<TMsgHead*>(pBuffer.get());
+                    uint64_t  nMsgId   = pMsgHead->nMsgId;
+                    size_t    szMsgLen = pMsgHead->szMsgLength;
+                    MsgType   msgtype = pMsgHead->msgType;
+                    pBuffer.reset(new char[szMsgLen + 1], deleter);
+                    memset(pBuffer.get(), 0, szMsgLen + 1);
+                    n_ret = readn(sockfd, pBuffer.get(), szMsgLen);
+                    if(n_ret < 0)
+                    {
+                        cout << "读sockfd失败！errno = " << errno << endl;
+                        close(sockfd);
+                        continue;
+                    }
+
+                    //json解码msg，放入任务队列
+                    cout << "接收到客户端命令: " << msgtype << endl;
+                    m_queTaskData.AddTask(std::make_shared<TTaskData>(
+                                                nMsgId,
+                                                sockfd,
+                                                msgtype,
+                                                string(pBuffer.get())));
+                }
+                else if (events[i].events & EPOLLERR)
+                {
+                    struct sockaddr_in clientaddr;
+                    socklen_t addrlen;
+                    getpeername(sockfd, (struct sockaddr*)&clientaddr, &addrlen);
+                    char* ip = inet_ntoa(clientaddr.sin_addr);
+                    short port = ntohs(clientaddr.sin_port);
+                    printf("客户端 %s:%d 掉线.\n", ip, port);
+                    int nClientId = m_COnlinePlayers.remove_player_by_socketfd(sockfd);
+                    m_pGameServer->remove_player(nClientId);
+                    close(sockfd);
+                }
+           }
+           //处理连接套接字
+           while(m_queSockFD.Try_GetTask(t_sockfd))
+           {
+                //设置用于读操作的文件描述符
+                ev.data.fd = t_sockfd.sockfd;
+                //设置用于注测的读操作事件
+                ev.events = EPOLLIN|EPOLLET;
+                //注册ev
+                n_ret = epoll_ctl(epfd, EPOLL_CTL_ADD, t_sockfd.sockfd, &ev);
+                IF_EXIT(n_ret < 0, "epoll_ctl");
+           }
+        }
+    }
+
+    void CServerMng::socket_send_thread_func()
+    {
+        int nRet = 0;
+        int nSendBufferSize = 0;
+        char* pSendBuffer = NULL;
+        TMsgHead msgHead;
+        while(1)
+        {
+            shared_ptr<TTaskData> pTask = m_queSendMsg.Wait_GetTask();
+            msgHead.nMsgId = pTask->nTaskId;
+            msgHead.msgType = pTask->msgType;
+            msgHead.szMsgLength = pTask->strMsg.size();
+            nSendBufferSize = sizeof(TMsgHead) + msgHead.szMsgLength;
+            pSendBuffer = new char[nSendBufferSize];
+            memset(pSendBuffer, 0, sizeof(nSendBufferSize));
+            memcpy(pSendBuffer, &msgHead, sizeof(TMsgHead));
+            memcpy(pSendBuffer + sizeof(TMsgHead), pTask->strMsg.c_str(), msgHead.szMsgLength);
+            std::cout << "服务器返回：" << pTask->msgType << std::endl;
+            nRet = writen(pTask->nSockfd, pSendBuffer, nSendBufferSize);
+            if(nRet < 0)
+            {
+                cout << "发送线程：发送数据失败！" << endl;
+            }
+
+            if(pSendBuffer != NULL)
+            {
+                delete[] pSendBuffer;
+                pSendBuffer = NULL;
+            }
+        }
     }
 #elif __unix__ // all unices not caught above
     // Unix
