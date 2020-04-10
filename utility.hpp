@@ -10,6 +10,7 @@
 #include <future>
 #include <chrono>
 #include <algorithm>
+#include <numeric>
 
 struct TTaskData;
 struct TSocketFD;

@@ -15,7 +15,7 @@ using namespace geos::geom;
 using namespace geos::io;
 using namespace geos::operation::buffer;
 using namespace geos::index::quadtree;
-GeometryFactory global_factory;
+auto p_global_factory = GeometryFactory::create();
 
 //curses
 #include <curses.h>
@@ -539,7 +539,7 @@ void printf_format()
 void test_geo()
 {
     Coordinate coo(13132707.8850685, 4973200.0194835);
-    auto point = global_factory.createPoint(coo);
+    auto point = p_global_factory->createPoint(coo);
     if (point->isEmpty())
     {
         std::cout << "empty point" << std::endl;
