@@ -15,7 +15,7 @@ using namespace geos::geom;
 using namespace geos::io;
 using namespace geos::operation::buffer;
 using namespace geos::index::quadtree;
-auto p_global_factory = GeometryFactory::create();
+//auto p_global_factory = GeometryFactory::create();
 
 //curses
 #include <curses.h>
@@ -538,6 +538,8 @@ void printf_format()
 
 void test_geo()
 {
+    std::cout << "GEOS_VERSION = " << GEOS_VERSION << std::endl;
+    /*
     Coordinate coo(13132707.8850685, 4973200.0194835);
     auto point = p_global_factory->createPoint(coo);
     if (point->isEmpty())
@@ -556,15 +558,15 @@ void test_geo()
     std::cout << "x: " << point->getX() << " y: " << point->getY() << std::endl;
     std::cout << "string : " << point->toString() << std::endl;
     std::cout << "SRID : " << point->getSRID() << std::endl;
+    */
 
     //WKT WKB转换
     WKBWriter wkb_writer;
-    WKTWriter wkt_writer;
     std::ostringstream ostr;
-    wkb_writer.writeHEX(*point, ostr);
-    std::string wkt_str = wkt_writer.write(point);
-    std::cout << "WKB hex : " << ostr.str() << std::endl;
-    std::cout << "WKT string : " << wkt_str << std::endl;
+    //wkb_writer.writeHEX(*point, ostr);
+    //std::string wkt_str = wkt_writer.write(point);
+    //std::cout << "WKB hex : " << ostr.str() << std::endl;
+    //std::cout << "WKT string : " << wkt_str << std::endl;
 
     WKBReader wkb_reader;
     std::istringstream istr(ostr.str());
@@ -590,7 +592,7 @@ void test_geo()
     std::vector<Geometry*> vec_geo;
     for (const auto& wkb_hex : vec_wkb_hex)
     {
-        istr.clear();
+        std::istringstream istr;
         istr.str(wkb_hex);
         auto res_geo = wkb_reader.readHEX(istr);
         std::cout << ++i << " geo is " << res_geo->toString() << std::endl;
@@ -663,11 +665,13 @@ void test_geo()
         "wkb_reader 100w"
     );
     
+    /*
     if (!point)
     {
         delete point;
         point = nullptr;
     }
+    */
 
     for (auto p_geo : vec_geo)
     {
