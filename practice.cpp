@@ -1,9 +1,13 @@
 #include "practice.hpp"
 #include <stack>
+#include <signal.h>
+#include <stdlib.h>
+#include <stdio.h>
 #include <stdarg.h>
 #include <unistd.h>
 #include <string.h>
 #include <sstream>
+#include <sys/ioctl.h>//winsize
 #include "utility.hpp"
 using std::stack;
 //geos
@@ -19,6 +23,14 @@ using namespace geos::index::quadtree;
 
 //curses
 #include <curses.h>
+#define  ENTER 10
+#define  ESCAPE 27
+char param[10][10][13] = {
+	{ {"2"}, {"main_page"}, {"game_list"} },
+	{ {"2"}, {"asdf"}, {"sdfsdf"} },
+	{ {"3"}, {"poker"}, {"mine"}, {"snake"} }
+};
+WINDOW *menubar,*messagebar,*temp,*temp1;
 
 // test5
 int jump(int row, int col)
@@ -716,54 +728,225 @@ void initial()
     refresh();                    //将做清除萤幕的工作
 }
 
-void test_curses()
+void get_window_size(unsigned short& ws_row, unsigned short& ws_col)
 {
-  	initscr();
- 
-    box(stdscr, ACS_VLINE, ACS_HLINE); /*draw a box*/
-
-    move(LINES/2, COLS/2); /*move the cursor to the center*/
- 
-    waddstr(stdscr, "Hello, world!");
- 
-    refresh();
- 
-    getch();
- 
-    endwin();  
+	struct winsize	size;
+	if(ioctl(STDIN_FILENO, TIOCGWINSZ, (char *)&size) < 0){
+		printf("TIOCGWINSZ error\n");
+		exit(1);
+	}
+    ws_row = size.ws_row;
+    ws_col = size.ws_col;
 }
 
-void test_curses2()
+static void pr_winsize(unsigned short width, unsigned short height){
+    char buffer[1024] = {0};
+    sprintf(buffer, "height = %u, width = %u", width, height);
+    move(height / 2 + 2, width / 2);
+    waddstr(stdscr, buffer);
+}
+
+static void sig_winch(int signo){
+    box(stdscr, ACS_VLINE, ACS_HLINE);/*draw a box*/
+    unsigned short ws_row = 0, ws_col = 0;
+    get_window_size(ws_row, ws_col);
+    move(ws_row / 2 + 1, ws_col / 2);
+    waddstr(stdscr, "SIGWINCH received");
+	pr_winsize(ws_col, ws_row);
+    refresh();
+}
+
+
+void init_curses()
 {
-    initscr(); /*初始化屏幕*/
-    box(stdscr, '*', '*'); /*draw a box*/
-    move(LINES/2, COLS/2);
- 
-    if(start_color() == OK) /*开启颜色*/
+     initscr();
+     start_color();
+     init_pair(1,COLOR_WHITE,COLOR_BLACK);
+     init_pair(2,COLOR_BLACK,COLOR_WHITE);
+     init_pair(3,COLOR_RED,COLOR_WHITE);
+     init_pair(4,COLOR_WHITE,COLOR_RED);
+     init_pair(5,COLOR_GREEN, 0);
+     curs_set(0);
+     noecho();
+     keypad(stdscr,TRUE);
+}
+
+void message(const char *ss)
+{
+    wbkgd(messagebar,COLOR_PAIR(2));
+    wattron(messagebar,COLOR_PAIR(3));/*打开颜色显示*/
+    mvwprintw(messagebar,0,0,"%80s"," ");
+    mvwprintw(messagebar,0,(80-strlen(ss))/2-1,"%s",ss);
+    wattroff(messagebar,COLOR_PAIR(3));/*关闭颜色显示*/
+    wrefresh(messagebar);
+}
+
+void draw_menubar(WINDOW *menubar)
+{
+    int i;
+    wbkgd(menubar,COLOR_PAIR(2));
+    for(i=0;i<atoi(param[0][0]);i++)
     {
-     
-        init_pair(1, COLOR_RED, COLOR_GREEN); /*建立一个颜色对*/
-     
-		attron(COLOR_PAIR(1)); /*开启字符输出颜色*/
-	 
-		waddstr(stdscr, "Yet another Hello, world!");
-			 
-		attroff(COLOR_PAIR(1)); /*关闭颜色显示*/
-			 
-		refresh();
-			 
-		getch();
-	}
-	else
-	{
-			 
-		waddstr(stdscr, "Can not init color");
-				 
-		refresh();
-				 
-		getch();
-		 
-	}
-		 
+        wattron(menubar,COLOR_PAIR(3));
+        mvwprintw(menubar,0,i*14+2,"%1d.",i+1);
+        wattroff(menubar,COLOR_PAIR(3));
+        mvwprintw(menubar,0,i*14+4,"%-12s",param[0][i+1]);
+    }
+}
+void copyright()
+{
+    char* str[]={   "Orignal Author:htldm@bbs.chinaunix.net",
+                    "Modified By:Frank.Z @wh.cn",   
+                    "mailto:[frankzhang02010@gmail.com]",
+                    "Last Modified:2013.12.7 [GMT+8]"   };
+    int rows,cols;
+    int i;
+    getmaxyx(stdscr,rows,cols);
+    attron(A_UNDERLINE|COLOR_PAIR(1));
+    for(i=0;i<4;i++)
+        mvaddstr((rows-2)/2+i,(cols-strlen(str[2]))/2,str[i]);
+    attroff(A_UNDERLINE|COLOR_PAIR(1));
+    refresh();
+}
+
+WINDOW **draw_menu(int menu)
+{
+    int i,start_col;
+    WINDOW **items;
+    items=(WINDOW **)malloc((atoi(param[menu][0])+1)*sizeof(WINDOW *));
+    start_col=(menu-1)*14+2;
+    items[0]=newwin(atoi(param[menu][0])+2,14,3,start_col);
+    wbkgd(items[0],COLOR_PAIR(2));
+    box(items[0],ACS_VLINE,ACS_HLINE);
+    for(i=1;i<=atoi(param[menu][0]);i++)
+    {
+        items[i]=subwin(items[0],1,12,3+i,start_col+1);
+        wprintw(items[i],"%s",param[menu][i]);
+    }
+    wbkgd(items[1],COLOR_PAIR(4));
+    wrefresh(items[0]);
+    return items;
+}
+
+void delete_menu(WINDOW **items,int count)
+{
+    int i;
+    for(i=0;i<count;i++) delwin(items[i]);
+    free(items);
+}
+
+int scroll_menu(WINDOW **items,int menu)
+{
+    int key,count,selected=0;
+    count=atoi(param[menu][0]);
+    while (1)
+    {
+        key=getch();
+        if(key==KEY_DOWN || key==KEY_UP)
+        {
+            wbkgd(items[selected+1],COLOR_PAIR(2));
+            wnoutrefresh(items[selected+1]);
+            if (key==KEY_DOWN)
+                selected=(selected+1) % count;
+            else
+                selected=(selected+count-1) % count;
+            wbkgd(items[selected+1],COLOR_PAIR(4));
+            wnoutrefresh(items[selected+1]);
+            doupdate();
+         }
+        else if (key==KEY_LEFT || key==KEY_RIGHT)
+        {
+            delete_menu(items,count+1);
+            touchwin(stdscr);
+            refresh();
+            if (key==KEY_LEFT)
+            {
+                menu-=1;
+                if(menu<=0) menu=atoi(param[0][0]);
+                items=draw_menu(menu);
+                return scroll_menu(items,menu);
+            }
+            if (key==KEY_RIGHT)
+            {
+                menu+=1;
+                if(menu>atoi(param[0][0])) menu=1;
+                items=draw_menu(menu);
+                return scroll_menu(items,menu);
+            }
+        }
+        else if (key==ESCAPE || key=='0' || key=='q')
+        {
+            delete_menu(items,count+1);
+            return -1;
+        }
+        else if (key==ENTER)
+        {
+            delete_menu(items,count+1);
+            return selected;
+        }
+    }
+}
+
+void test_curses()
+{
+	init_curses();
+    bkgd(COLOR_PAIR(1));
+    menubar=subwin(stdscr,1,80,1,0);
+    messagebar=subwin(stdscr,1,80,24,0);
+    temp=subwin(stdscr,22,80,2,0);
+    temp1=subwin(stdscr,20,78,3,1);
+	char ss[128] = { 0 };
+	strcpy(ss,"General Menu Generate Program");
+    mvwprintw(stdscr,0,(80-strlen(ss))/2-1,"%s",ss);
+	draw_menubar(menubar);
+    message("Use nub key to choses menu. ESC or '0'to Exit");
+    box(temp, ACS_VLINE, ACS_HLINE);
+    refresh();
+    copyright();
+	int key = 0;
+	WINDOW **menu_items;
+    int selected_item = 0;
+	do {
+            std::ostringstream ostr;
+            ostr << "ESCAPE = " << ESCAPE;
+            message(ostr.str().c_str());
+            key=getch();
+            ostr.str("");
+            ostr << "get input = " << key;
+            message(ostr.str().c_str());
+            if(isdigit(key) && key > '0' && key <= atoi(param[0][0]) + '0')
+            {
+                message("enter menu");
+                werase(messagebar);
+                wrefresh(messagebar);
+                menu_items=draw_menu(key-'0');
+                selected_item=scroll_menu(menu_items, key-'0');
+                touchwin(stdscr);
+                refresh();
+            }
+        } while(key!=ESCAPE && key!='q' && key!='0');
+ 
+    message("end");
+    //test receive SIGWINCH
+    if( isatty(STDIN_FILENO) == 0  )
+    {
+        exit(1);
+    }
+
+    if(signal(SIGWINCH, sig_winch) == SIG_ERR)
+    {
+        perror("signal error");
+    }
+
+    for (;;)
+    {
+        pause();
+    }
+
+    attroff(COLOR_PAIR(1)); 
+	delwin(temp1);
+    delwin(temp);
+    delwin(menubar);
+    delwin(messagebar);
 	endwin(); /*关闭curses状态*/
 }

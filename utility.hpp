@@ -265,9 +265,13 @@ int get_input_number();
 
 std::string get_input_string();
 
+
 /*
- * 常用并行算法 
- */
+-----------------------------------------
+** 常用并行算法 
+----------------------------------------
+*/
+
 class join_threads
 {
 public:
@@ -296,14 +300,6 @@ T accumulate_block(Iterator first, Iterator last)
 {
     return std::accumulate(first, last, T()); 
 }
-/*
-struct accumulate_block
-{
-    T operator() (Iterator first, Iterator last)
-    {
-        return std::accumulate(first, last, T());                                                                          
-    }
-};*/
 
 
 template<typename Iterator, typename T>
@@ -348,7 +344,7 @@ T parallel_accumulate(Iterator first, Iterator last, T init)
     return result;
 }
 
-//递归划分数据 运行时间不稳定
+//递归划分数据
 template<typename Iterator, typename T, typename Func>
 T parallel_accumulate_r(Iterator first, Iterator last, T init, Func func)
 {
@@ -372,7 +368,9 @@ T parallel_accumulate_r(Iterator first, Iterator last, T init, Func func)
 }
 
 /*
+----------------------------
 ** std::for_each 并行版本
+---------------------------
 */
 template<typename Iterator, typename Func>
 void parallel_for_each(Iterator first, Iterator last, Func f)
@@ -417,7 +415,7 @@ void parallel_for_each(Iterator first, Iterator last, Func f)
     }
 }
 
-//递归划分数据 运行时间不稳定
+//递归划分数据
 template<typename Iterator, typename Func>
 void parallel_for_each_r(Iterator first, Iterator last, Func f)
 {
@@ -439,6 +437,149 @@ void parallel_for_each_r(Iterator first, Iterator last, Func f)
     }
 }
 
+
+/*
+-------------------------
+ * 使用细粒度锁的线程安全队列
+ * 1. 队列使用两个互斥元，用来保护head和tail
+ * 2. 队列预先分配一个不存储数据的傀儡节点，以保证队列中至少有一个节点, 目的
+      是使头尾两个节点的访问分开，以便不需要同时锁住两个互斥元。
+ * 3.  
+ *
+-------------------------
+*/
+template<typename T>
+class threadsafe_queue
+{
+private:
+    struct node
+    {
+        std::shared_ptr<T> data;
+        std::unique_ptr<node> next;
+    };
+
+    std::mutex head_mutex;
+    std::unique_ptr<node> head;
+    std::mutex tail_mutex;
+    node* tail;
+    std::condition_variable data_cond;
+
+public:
+    threadsafe_queue() :
+        head(new node), tail(head.get())
+    {}
+
+    threadsafe_queue(const threadsafe_queue& other) = delete;
+    threadsafe_queue& operator=(const threadsafe_queue& other) = delete;
+
+    std::shared_ptr<T> try_pop()
+    {
+        std::unique_ptr<node> old_head = try_pop_head();
+        return old_head ? old_head->data : std::shared_ptr<T>();
+    }
+
+    bool try_pop(T& value)
+    {
+        std::unique_ptr<node> const old_head = try_pop_head(value);
+        return old_head;
+    }
+
+    std::shared_ptr<T> wait_and_pop()
+    {
+        std::unique_ptr<node> const old_head = wait_pop_head();
+        return old_head->data;
+    }
+
+    void wait_and_pop(T& value)
+    {
+        std::unique_ptr<node> const old_head = wait_pop_head(value);
+    }
+
+    void push(T new_value)
+    {
+        std::shared_ptr<T> new_data(std::make_shared<T>(std::move(new_value)));
+        //每次从尾巴push一个元素，同时新建一个空元素做新的尾巴
+        std::unique_ptr<node> p(new node);
+        {
+            std::lock_guard<std::mutex> tail_lock(tail_mutex);
+            tail->data = new_data;
+            node* const new_tail = p.get();
+            tail->next = std::move(p);
+            tail = new_tail;
+        }
+        data_cond.notify_one();
+    }
+
+    bool empty()
+    {
+        std::lock_guard<std::mutex> head_lock(head_mutex);
+        return (head.get() == get_tail());
+    }
+
+private:
+    node* get_tail()
+    {
+        std::lock_guard<std::mutex> tail_lock(tail_mutex);
+        return tail;
+    }
+    
+    std::unique_ptr<node> pop_head()
+    {
+        std::unique_ptr<node> old_head = std::move(head);
+        head = std::move(old_head->next);
+        return old_head;
+    }
+
+    std::unique_lock<std::mutex> wait_for_data()
+    {
+        std::unique_lock<std::mutex> head_lock(head_mutex);
+        data_cond.wait(head_lock, [&](){ return head.get() != get_tail(); });
+        return std::move(head_lock);
+    }
+
+    std::unique_ptr<node> wait_pop_head()
+    {
+        std::unique_lock<std::mutex> head_lock(wait_for_data());
+        return pop_head();
+    }
+
+    std::unique_ptr<node> wait_pop_head(T& value)
+    {
+        std::unique_lock<std::mutex> head_lock(wait_for_data());
+        value = std::move(*head->data);
+        return pop_head();
+    }
+
+    //try
+    std::unique_ptr<node> try_pop_head()
+    {
+        std::lock_guard<std::mutex> head_lock(head_mutex);
+        if (head.get() == get_tail())
+        {
+            return std::unique_ptr<node>();
+        }
+        return pop_head();
+    }
+
+    std::unique_ptr<node> try_pop_head(T& value)
+    {
+        std::lock_guard<std::mutex> head_lock(head_mutex);
+        if (head.get() == get_tail())
+        {
+            return std::unique_ptr<node>();
+        }
+        value = std::move(*head->data);
+        return pop_head();
+    }
+};
+
+/**
+---------------------------
+ * 有等待任务的线程池
+---------------------------
+ */
+
+
 //编码转换
 void TransCoding(const char* from_code, const char* to_code, const std::string& in, std::string& out);
 
@@ -450,3 +591,5 @@ void TransCoding(const char* from_code, const char* to_code, const std::string& 
     auto time_span = std::chrono::duration_cast<std::chrono::duration<double>>(end - start);\
 	std::cout << desc << " cost " << time_span.count() << "s" << std::endl;\
 }
+
+
