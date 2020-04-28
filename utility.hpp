@@ -11,6 +11,8 @@
 #include <chrono>
 #include <algorithm>
 #include <numeric>
+#include <functional>
+#include <type_traits>
 
 struct TTaskData;
 struct TSocketFD;
@@ -301,7 +303,6 @@ T accumulate_block(Iterator first, Iterator last)
     return std::accumulate(first, last, T()); 
 }
 
-
 template<typename Iterator, typename T>
 T parallel_accumulate(Iterator first, Iterator last, T init)
 {
@@ -368,9 +369,9 @@ T parallel_accumulate_r(Iterator first, Iterator last, T init, Func func)
 }
 
 /*
-----------------------------
-** std::for_each 并行版本
----------------------------
+ ************************************** 
+ * std::for_each 并行版本
+ ************************************** 
 */
 template<typename Iterator, typename Func>
 void parallel_for_each(Iterator first, Iterator last, Func f)
@@ -439,14 +440,12 @@ void parallel_for_each_r(Iterator first, Iterator last, Func f)
 
 
 /*
--------------------------
+ * ******************************************************
  * 使用细粒度锁的线程安全队列
  * 1. 队列使用两个互斥元，用来保护head和tail
  * 2. 队列预先分配一个不存储数据的傀儡节点，以保证队列中至少有一个节点, 目的
       是使头尾两个节点的访问分开，以便不需要同时锁住两个互斥元。
- * 3.  
- *
--------------------------
+ * ******************************************************
 */
 template<typename T>
 class threadsafe_queue
@@ -481,7 +480,7 @@ public:
     bool try_pop(T& value)
     {
         std::unique_ptr<node> const old_head = try_pop_head(value);
-        return old_head;
+        return old_head ? true : false;
     }
 
     std::shared_ptr<T> wait_and_pop()
@@ -550,7 +549,6 @@ private:
         return pop_head();
     }
 
-    //try
     std::unique_ptr<node> try_pop_head()
     {
         std::lock_guard<std::mutex> head_lock(head_mutex);
@@ -574,11 +572,238 @@ private:
 };
 
 /**
----------------------------
+ * ****************************
  * 有等待任务的线程池
----------------------------
+ * ****************************
+ */
+class function_wrapper
+{
+private:
+	struct impl_base
+	{
+		virtual void call() = 0;
+		virtual ~impl_base() {}
+	};
+
+	std::unique_ptr<impl_base> impl;
+
+	template<typename F>
+	struct impl_type : impl_base
+	{
+		F f;
+		impl_type(F&& f_) : f(std::move(f_)) {};
+		void call() { f(); }
+	};
+
+public:
+	template<typename F>
+	function_wrapper(F&& f) :
+		impl(new impl_type<F>(std::move(f)))
+	{}
+
+	void operator() () { impl->call(); }
+
+	function_wrapper() = default;
+
+	function_wrapper(function_wrapper&& other):
+		impl(std::move(other.impl))
+	{}
+
+	function_wrapper& operator=(function_wrapper&& other)
+	{
+		impl = std::move(other.impl);
+		return *this;
+	}
+
+	function_wrapper(const function_wrapper&) = delete;
+	function_wrapper(function_wrapper&) = delete;
+	function_wrapper& operator=(function_wrapper&) = delete;
+};
+
+class thread_pool
+{
+private:
+	std::atomic_bool done;
+	threadsafe_queue<function_wrapper> work_queue;
+	std::vector<std::thread> threads;
+	join_threads joiner;
+
+	//线程函数
+	void worker_thread()
+	{
+		while (!done)
+		{
+			function_wrapper task;
+			if (work_queue.try_pop(task))
+			{
+				task();
+			}
+			else
+			{
+				std::this_thread::yield();
+			}
+		}
+	}
+
+public:
+	thread_pool() :
+		done(false), joiner(threads)
+	{
+		//设置线程数量
+		unsigned const thread_count = std::thread::hardware_concurrency();
+		try
+		{
+			for (unsigned i = 0; i < thread_count; ++i)
+			{
+				//加入线程池
+				threads.push_back(
+						std::thread(&thread_pool::worker_thread, this));
+			}
+		}
+		catch (...)
+		{
+			done = true;
+			throw;
+		}
+	}
+
+	~thread_pool()
+	{
+		done = true;
+	}
+
+	//提交任务到工作队列
+	template<typename FunctionType>
+	void submit(FunctionType f)
+	{
+		work_queue.push(std::move(f));
+	}
+	
+	//提交任务到工作队列，并等待结果
+	template<typename FunctionType>
+	std::future<typename std::result_of<FunctionType()>::type>
+	submit_wait_result(FunctionType f)
+	{
+		typedef typename std::result_of<FunctionType()>::type
+			result_type;
+		std::packaged_task<result_type()> task(std::move(f));
+		std::future<result_type> res(task.get_future());
+		//调用function_wrapper的右值构造 
+		work_queue.push(std::move(task));
+		return res;
+	}
+
+	//主动执行正在等待的任务
+	void run_pending_task()
+	{
+		function_wrapper task;
+		if (work_queue.try_pop(task))
+		{
+			task();
+		}
+		else
+		{
+			std::this_thread::yield();
+		}
+	}
+};
+
+/*
+ *****************************************
+ * 使用可等待任务线程池的 parallel_accumulate
+ *****************************************
  */
 
+template<typename Iterator, typename T>
+T parallel_accumulate_using_thread_pool(Iterator first, Iterator last, T init)
+{
+	unsigned long const length = std::distance(first, last);
+	if (!length) return init;
+	unsigned long const block_size = 25;
+	unsigned long const num_blocks = (length + block_size - 1) / block_size;
+
+    std::vector<std::future<T>> futures(num_blocks - 1);
+	thread_pool pool;
+
+	Iterator block_start = first;
+	for (unsigned long i = 0; i < (num_blocks - 1); ++i)
+	{
+		Iterator block_end = block_start;
+		std::advance(block_end, block_size);
+		futures[i] = pool.submit_wait_result([block_start, block_end]() -> T {
+					return std::accumulate(block_start, block_end, T());
+				});
+		block_start = block_end;
+	}
+
+	T last_result = std::accumulate(block_start, last, T()); 
+	T result = init;
+	for (unsigned long i = 0; i < (num_blocks - 1); ++i)
+	{
+		result += futures[i].get();
+	}
+
+	result += last_result;
+	return result;
+}
+
+/*
+ *****************************************
+ * 基于线程池的快速排序
+ *****************************************
+ */
+template<typename T>
+struct sorter
+{
+	thread_pool pool;
+
+	std::list<T> do_sort(std::list<T>& chunk_data)
+	{
+		if (chunk_data.empty())
+		{
+			return chunk_data;
+		}
+
+		std::list<T> result;
+		result.splice(result.begin(), chunk_data, chunk_data.begin());
+		T const& partition_val = *result.begin();
+
+		typename std::list<T>::iterator divide_point =
+			std::partition(chunk_data.begin(), chunk_data.end(),
+							[&partition_val] (T const& val) { return val < partition_val; });
+
+		std::list<T> new_lower_chunk;
+		new_lower_chunk.splice(new_lower_chunk.end(),
+								chunk_data, chunk_data.begin(),
+								divide_point);
+
+		std::future<std::list<T>> new_lower =
+			pool.submit_wait_result(std::bind(&sorter::do_sort, this, std::move(new_lower_chunk)));
+			//pool.submit([this, new_lower_chunk(new_lower_chunk)] () { this->do_sort(new_lower_chunk); }); //-std=c++14
+
+		std::list<T> new_higher(do_sort(chunk_data));
+
+		result.splice(result.end(), new_higher);
+		while (new_lower.wait_for(std::chrono::seconds(0)) == std::future_status::timeout)
+		{
+			pool.run_pending_task();
+		}
+
+		result.splice(result.begin(), new_lower.get());
+		return result;
+	}
+};
+
+template<typename T>
+std::list<T> parallel_quick_sort(std::list<T> input)
+{
+	if (input.empty())
+	{
+		return input;
+	}
+	sorter<T> s;
+	return s.do_sort(input);
+}
 
 //编码转换
 void TransCoding(const char* from_code, const char* to_code, const std::string& in, std::string& out);

@@ -668,16 +668,13 @@ int main(int argc, char const *argv[])
     std::for_each(v.begin(), v.end(), [](std::thread& th){
         th.join();
     });*/
-    uuid_t out;
-    uuid_generate(out);
-    char buf[64] = {0};
-    uuid_unparse_lower(out, buf);
-    std::string str_uuid(buf);
-    str_uuid.replace(8, 1, "");
-    str_uuid.replace(12, 1, "");
-    str_uuid.replace(16, 1, "");
-    str_uuid.replace(20, 1, "");
-    std::cout << "uuid = " << str_uuid << " " << str_uuid.length() << std::endl;
+	std::list<int> lst{4, 2, 5, 1, 3, 4, 8 ,2};
+	auto new_lst = parallel_quick_sort(lst);
+	for (const auto& val : new_lst)
+	{
+		std::cout << val << " ";
+	}
+
 
     return 0;
 }
