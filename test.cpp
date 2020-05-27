@@ -14,6 +14,7 @@
 #include <uuid/uuid.h>
 #include "practice.hpp"
 #include "utility.hpp"
+#include "rb_tree_ini.hpp"
 /*-----------------------*/
 #define CalcTimeFuncInvoke(invoke, desc) {\
     auto start = std::chrono::steady_clock::now();\
@@ -668,13 +669,25 @@ int main(int argc, char const *argv[])
     std::for_each(v.begin(), v.end(), [](std::thread& th){
         th.join();
     });*/
-	std::list<int> lst{4, 2, 5, 1, 3, 4, 8 ,2};
-	auto new_lst = parallel_quick_sort(lst);
-	for (const auto& val : new_lst)
-	{
-		std::cout << val << " ";
-	}
+    RBTree<int> int_rbt;
+    //std::vector<int> vec{0, 4, 2, 5, 1, 3, 4, 8, 2};
+    std::vector<int> vec{8, 1, 5, 0, 6, 3, 1, 9, 9};
+    for (auto k : vec)
+    {
+        std::cout << "k = " << k << std::endl;
+        int_rbt.insert(k);
+        int_rbt.in_order();
+    }
 
-
+    for (auto k : vec)
+    {
+        std::cout << "k = " << k << std::endl;
+        if(int_rbt.remove(k))
+        {
+            std::cout << "remove [" << k << "] : ";
+            int_rbt.in_order();
+        }
+    }
+        
     return 0;
 }
