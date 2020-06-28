@@ -14,7 +14,7 @@
 #include <uuid/uuid.h>
 #include "practice.hpp"
 #include "utility.hpp"
-#include "rb_tree_ini.hpp"
+#include "./rb_tree/os_tree_ini.hpp"
 /*-----------------------*/
 #define CalcTimeFuncInvoke(invoke, desc) {\
     auto start = std::chrono::steady_clock::now();\
@@ -677,6 +677,20 @@ int main(int argc, char const *argv[])
         std::cout << "k = " << k << std::endl;
         int_rbt.insert(k);
         int_rbt.in_order();
+    }
+
+    for (int i = 0; i < 10; ++i)
+    {
+        std::cout << "search " << i << ", ";
+        auto res = int_rbt.search_k(i);
+        if (res)
+        {
+            std::cout << "OK" << res->data << std::endl;
+        }
+        else
+        {
+            std::cout << "FAIL" << std::endl;
+        }
     }
 
     for (auto k : vec)

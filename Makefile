@@ -9,7 +9,7 @@ OBJ5 = utility.o
 #OBJ6 = rb_tree.o
 
 test : $(OBJ1) $(OBJ5) $(OBJ6)
-	g++ $(OBJ1) $(OBJ5) -lcurses -lpthread -lgeos -luuid -o test
+	g++ -g $(OBJ1) $(OBJ5) -lcurses -lpthread -lgeos -luuid -o test
 server : $(OBJ2) $(OBJ4) $(OBJ5)
 	g++ $(OBJ2) $(OBJ4) $(OBJ5) -lpthread -ljsoncpp -o server
 client : $(OBJ3) $(OBJ4) $(OBJ5)
