@@ -13,11 +13,12 @@ using namespace std;
 
 static void http_cb(struct evhttp_request* request, void* arg)
 {
-    cout << "http_cb" <<endl;
+    cout << "\nhttp_cb" <<endl;
     //1 获取游览器的请求信息
     //uri
     const char* uri = evhttp_request_get_uri(request);
-    cout << "\n\nuri: " << uri << endl;
+    cout << "\n=====request======" << endl;
+    cout << "uri: " << uri << endl;
 
     // 请求类型 GET POST
     string cmdtype;
@@ -30,7 +31,7 @@ static void http_cb(struct evhttp_request* request, void* arg)
         cmdtype = "POST";
         break;
     }
-    cout << "cmdtype: " << cmdtype << endl;
+    cout << "method: " << cmdtype << endl;
 
     //消息头
     evkeyvalq* headers = evhttp_request_get_input_headers(request);
@@ -124,7 +125,7 @@ int main()
     evhttp* evh = evhttp_new(base);
 
     //2. 绑定端口和IP
-    if(evhttp_bind_socket(evh, "0.0.0.0", 8080) != 0)
+    if(evhttp_bind_socket(evh, "0.0.0.0", 8081) != 0)
     {
         cout << "evhttp_bind_socket failed!" << endl;
     }

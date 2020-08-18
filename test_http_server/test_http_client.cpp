@@ -1,9 +1,12 @@
+#include <event2/dns.h>
 #include <event2/event.h>
 #include <event2/http.h>
+#include <event2/keyvalq_struct.h>
 #include <event2/bufferevent.h>
 #include <event2/buffer.h>
 #include <iostream>
 #include <string.h>
+#include "test_http_client.h"
 #ifndef _WIN32
 #include <signal.h>
 #endif
@@ -17,7 +20,7 @@ static void http_client_cb(struct evhttp_request* req, void* ctx)
     if(req == NULL)
     {
         int errcode = EVUTIL_SOCKET_ERROR();
-        evutil_socket_error_to_string(errcode);
+        cout << "请求出错: " << evutil_socket_error_to_string(errcode) << std::endl;
         return;
     }
 
@@ -25,32 +28,34 @@ static void http_client_cb(struct evhttp_request* req, void* ctx)
     const char* path = evhttp_request_get_uri(req);
     cout << "request path is " << path << endl;
 
-    string filepath = ".";
-    filepath += path;
-    cout << "filepath is " << filepath << endl;
-    FILE* fp = fopen(filepath.c_str(), "wb");
-    if(!fp)
+    //请求
+    cout << "=====request headers======" << endl;
+    evkeyvalq* headers = evhttp_request_get_output_headers(req);
+    for(evkeyval* p = headers->tqh_first; p != NULL; p = p->next.tqe_next)
     {
-        cout << "open file " << filepath << " failed!" << endl;
+        cout << p->key << ": " << p->value << endl;
+    }
+    cout << "=====response headers======" << endl;
+    headers = evhttp_request_get_input_headers(req);
+    for(evkeyval* p = headers->tqh_first; p != NULL; p = p->next.tqe_next)
+    {
+        cout << p->key << ": " << p->value << endl;
     }
 
-    //获取返回的code
-    cout << "Response : " << evhttp_request_get_response_code(req) << " ";
-    cout << evhttp_request_get_response_code_line(req) << endl;
     char buf[1024] = {0};
+    //获取返回的code
+    cout << "Response code : " << evhttp_request_get_response_code(req) << std::endl;
+
+    //返回body
+    cout << "=====response body======" << endl;
     evbuffer* input = evhttp_request_get_input_buffer(req);
     for(;;)
     {
         int len = evbuffer_remove(input, buf, sizeof(buf) -1);
         if(len <= 0) break;
         buf[len] = 0;
-        //cout << buf << fflush;
-        if(!fp)
-            continue;
-        fwrite(buf, 1, len, fp);
+        cout << buf << std::endl;
     }
-    if(fp)
-        fclose(fp);
     
     event_base_loopbreak(base);
 }
@@ -58,6 +63,7 @@ static void http_client_cb(struct evhttp_request* req, void* ctx)
 int TestGetHttp()
 {
     event_base* base = event_base_new();
+    evdns_base* dnsbase = evdns_base_new(base, 1);
 
     //生成请求信息 GET
     string http_url = "http://ffmpeg.club/index.html";
@@ -75,11 +81,11 @@ int TestGetHttp()
     cout << "scheme is " << scheme << endl;
 
     int port = evhttp_uri_get_port(uri);
-    cout << "port is " << port << endl;
     if(port == -1)
     {
         port = 80;
     }
+    cout << "port is " << port << endl;
 
     //host
     const char* host = evhttp_uri_get_host(uri);
@@ -108,8 +114,8 @@ int TestGetHttp()
     }
 
     //bufferevent 连接http服务器
-    bufferevent* bev = bufferevent_socket_new(base, -1, BEV_OPT_CLOSE_ON_FREE);
-    evhttp_connection* evcon = evhttp_connection_base_bufferevent_new(base, NULL, bev, host, port);
+    //bufferevent* bev = bufferevent_socket_new(base, -1, BEV_OPT_CLOSE_ON_FREE);
+    evhttp_connection* evcon = evhttp_connection_base_new(base, dnsbase, host, port);
 
     //http client 请求
     evhttp_request* req = evhttp_request_new(http_client_cb, base);
@@ -119,28 +125,28 @@ int TestGetHttp()
     evhttp_add_header(output_headers, "Host", host);
 
     //发起请求
-	std::string uri_path = path;
+    std::string uri_path = path;
     if (query) {
         uri_path += "?";
-        uri_path += query; 
+        uri_path += query;
     }
     evhttp_make_request(evcon, req, EVHTTP_REQ_GET, uri_path.c_str());
 
     //进入事件主循环
-    if(base)
-    {
+    if(base) {
         event_base_dispatch(base);
         event_base_free(base);
+    }
+    if (dnsbase) {
+        evdns_base_free(dnsbase, 0);
     }
     return 0;
 }
 
-int TestPostHttp()
+int TestPostHttp(std::string http_url, std::string& data)
 {
-     event_base* base = event_base_new();
-
-    //生成请求信息 POST
-    string http_url = "http://127.0.0.1:8081/index.html";
+    event_base* base = event_base_new();
+    evdns_base* dnsbase = evdns_base_new(base, 1);
 
     //分析url地址
     //uri
@@ -187,8 +193,8 @@ int TestPostHttp()
     }
 
     //bufferevent 连接http服务器
-    bufferevent* bev = bufferevent_socket_new(base, -1, BEV_OPT_CLOSE_ON_FREE);
-    evhttp_connection* evcon = evhttp_connection_base_bufferevent_new(base, NULL, bev, host, port);
+    //bufferevent* bev = bufferevent_socket_new(base, -1, BEV_OPT_CLOSE_ON_FREE);
+    evhttp_connection* evcon = evhttp_connection_base_new(base, dnsbase, host, port);
 
     //http client 请求
     evhttp_request* req = evhttp_request_new(http_client_cb, base);
@@ -196,43 +202,32 @@ int TestPostHttp()
     // 设置请求的header信息
     evkeyvalq* output_headers = evhttp_request_get_output_headers(req);
     evhttp_add_header(output_headers, "Host", host);
+    evhttp_add_header(output_headers, "Content-Type", "application/json");
 
     //发送post数据
+    cout << "post data: " << data << std::endl;
     evbuffer* output = evhttp_request_get_output_buffer(req);
-    evbuffer_add_printf(output, "xcj=%d&b=%d", 1, 2);
+    int res = evbuffer_add(output, data.c_str(), data.size());
+    if (res != 0) {
+        std::cout << "evbuffer_add error" << std::endl;
+    }
 
     //发起请求
-	std::string uri_path = path;
+    std::string uri_path = path;
     if (query) {
         uri_path += "?";
-        uri_path += query; 
+        uri_path += query;
     }
     evhttp_make_request(evcon, req, EVHTTP_REQ_POST, uri_path.c_str());
-    
 
     //进入事件主循环
-    if(base)
-    {
+    if(base) {
         event_base_dispatch(base);
         event_base_free(base);
     }
+    if (dnsbase) {
+        evdns_base_free(dnsbase, 0);
+    }
     return 0;
 }
 
-int main()
-{
-#ifdef _WIN32 
-    //初始化socket库
-    WSADATA wsa;
-    WSAStartup(MAKEWORD(2,2),&wsa);
-#else
-    //忽略管道信号，发送数据给已经关闭的socket
-    if (signal(SIGPIPE, SIG_IGN) == SIG_ERR)
-        return 1;
-#endif
-    //TestGetHttp();
-
-    TestPostHttp();
-   
-    return 0;
-}
