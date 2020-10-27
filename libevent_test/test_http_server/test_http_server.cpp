@@ -15,10 +15,13 @@ static void http_cb(struct evhttp_request* request, void* arg)
 {
     cout << "\nhttp_cb" <<endl;
     //1 获取游览器的请求信息
+    const struct evhttp_uri* evhttp_uri = evhttp_request_get_evhttp_uri(request);
     //uri
     const char* uri = evhttp_request_get_uri(request);
     cout << "\n=====request======" << endl;
     cout << "uri: " << uri << endl;
+    printf("path:%s\n", evhttp_uri_get_path(evhttp_uri));
+    printf("query:%s\n", evhttp_uri_get_query(evhttp_uri));
 
     // 请求类型 GET POST
     string cmdtype;
