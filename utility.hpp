@@ -1,5 +1,6 @@
 #pragma once
 #include <iostream>
+#include <sstream>
 #include <string>
 #include <vector>
 #include <list>
@@ -805,6 +806,19 @@ std::list<T> parallel_quick_sort(std::list<T> input)
 	sorter<T> s;
 	return s.do_sort(input);
 }
+
+//字符串转数字
+template<typename T>
+class StrConvert
+{
+public:
+    T convert(const std::string& str) {
+        std::istringstream istr(str);
+        T buf;
+        istr >> buf;
+        return buf;
+    }   
+};
 
 //编码转换
 void TransCoding(const char* from_code, const char* to_code, const std::string& in, std::string& out);
