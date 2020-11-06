@@ -1,11 +1,13 @@
 #include "utility.hpp"
 #include <iostream>
+#include <sstream>
+
 #include <sys/socket.h>
+#include <sys/time.h>
 #include <unistd.h>
 #include <fcntl.h>
 #include <stdlib.h>
 #include <stdio.h>
-#include <sys/time.h>
 #include <iconv.h>
 
 using std::cin;
@@ -285,4 +287,14 @@ void TransCoding(const char* from_code, const char* to_code, const std::string& 
     Convert(from_code, to_code, in.c_str(), in_size, new_out, 2 * in_size);
     out.assign(new_out);
     delete[] new_out;
+}
+
+void SplitStr(const std::string& source, const char delimiter, std::vector<std::string>& result)
+{
+    std::istringstream istr(source);
+    std::string temp;
+    while (std::getline(istr, temp, delimiter))
+    {
+        result.push_back(temp);
+    }
 }
