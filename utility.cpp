@@ -2,13 +2,18 @@
 #include <iostream>
 #include <sstream>
 
-#include <sys/socket.h>
-#include <sys/time.h>
-#include <unistd.h>
-#include <fcntl.h>
 #include <stdlib.h>
 #include <stdio.h>
+
+#include <sys/socket.h>
+#include <sys/time.h>
+#include <sys/types.h>                                                                              
+#include <sys/stat.h>
+
 #include <string.h>
+#include <dirent.h>                                                                                 
+#include <unistd.h>
+#include <fcntl.h>
 #include <iconv.h>
 
 using std::cin;
@@ -303,3 +308,52 @@ void SplitStr(const std::string& source, const std::string& delimiter, std::vect
                                                                                                        
     delete[] strc;
 }
+
+static bool is_dir(const std::string& str_path) {                                                          
+    struct stat st;                                                                                 
+    if(stat(str_path.c_str(), &st) < 0) {                                                           
+        fprintf(stderr, "invalid path %s\n", str_path.c_str());                                     
+        return false;                                                                               
+    }                                                                                               
+    return S_ISDIR(st.st_mode);                                                                     
+} 
+
+void traverse_dir(const std::string& str_dir, std::vector<std::string>* vec_files, std::vector<std::string>* vec_dirs) {
+    struct dirent *pdirent = NULL;                                                                  
+    DIR *d_info = opendir(str_dir.c_str());                                                         
+    if (!d_info) {                                                                                  
+        fprintf(stderr, "can not open dir %s\n", str_dir.c_str());                                  
+        return;                                                                                     
+    }                                                                                               
+    while ((pdirent = readdir(d_info)) != NULL) {                                                   
+        if (strncmp(pdirent->d_name, ".", 1) == 0 ||                                                
+                strncmp(pdirent->d_name, "..", 2) == 0) {                                           
+            continue;                                                                               
+        }                                                                                           
+        if (pdirent->d_type == DT_UNKNOWN) {                                                        
+            //未知类型（可能d_type不支持)                                                           
+            std::ostringstream ostr;                                                                   
+            ostr << str_dir << "/" << pdirent->d_name;                                                 
+            if (is_dir(ostr.str())) {                                                                  
+                if (vec_dirs) {                                                                        
+                    vec_dirs->emplace_back(pdirent->d_name);                                           
+                }                                                                                      
+            } else {                                                                                   
+                if (vec_files) {                                                                       
+                    vec_files->emplace_back(pdirent->d_name);                                          
+                }                                                                                   
+            }                                                                                       
+        } else if (pdirent->d_type == DT_REG) {                                                     
+            //常规文件                                                                              
+            if (vec_files) {                                                                        
+                vec_files->emplace_back(pdirent->d_name);                                           
+            }                                                                                       
+        } else if (pdirent->d_type == DT_DIR) {                                                     
+            //目录文件                                                                              
+            if (vec_dirs) {                                                                         
+                vec_dirs->emplace_back(pdirent->d_name);                                            
+            }                                                                                       
+        }                                                                                           
+    }                                                                                               
+    closedir(d_info);                                                                               
+} 

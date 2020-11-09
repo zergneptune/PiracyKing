@@ -826,6 +826,9 @@ void TransCoding(const char* from_code, const char* to_code, const std::string& 
 //分隔字符串
 void SplitStr(const std::string& source, const std::string& delimiter, std::vector<std::string>& result);
 
+//目录遍历
+void traverse_dir(const std::string& str_dir, std::vector<std::string>* vec_files, std::vector<std::string>* vec_dirs);
+
 //计算语句调用花费的时间宏
 #define CalcTimeFuncInvoke(invoke, desc) {\
     auto start = std::chrono::steady_clock::now();\
@@ -834,5 +837,4 @@ void SplitStr(const std::string& source, const std::string& delimiter, std::vect
     auto time_span = std::chrono::duration_cast<std::chrono::duration<double>>(end - start);\
 	std::cout << desc << " cost " << time_span.count() << "s" << std::endl;\
 }
-
 
