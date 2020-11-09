@@ -8,6 +8,7 @@
 #include <fcntl.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 #include <iconv.h>
 
 using std::cin;
@@ -289,12 +290,16 @@ void TransCoding(const char* from_code, const char* to_code, const std::string& 
     delete[] new_out;
 }
 
-void SplitStr(const std::string& source, const char delimiter, std::vector<std::string>& result)
+void SplitStr(const std::string& source, const std::string& delimiter, std::vector<std::string>& result)
 {
-    std::istringstream istr(source);
-    std::string temp;
-    while (std::getline(istr, temp, delimiter))
-    {
-        result.push_back(temp);
-    }
+    char * strc = new char[strlen(source.c_str())+1];                                                     
+    strcpy(strc, source.c_str());                                                                         
+    char* tmpStr = strtok(strc, delimiter.c_str());                                                      
+    while (tmpStr != NULL)                                                                             
+    {                                                                                                  
+        result.push_back(std::string(tmpStr));                                                      
+        tmpStr = strtok(NULL, delimiter.c_str());                                                        
+    }                                                                                                  
+                                                                                                       
+    delete[] strc;
 }

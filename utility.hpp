@@ -824,7 +824,7 @@ public:
 void TransCoding(const char* from_code, const char* to_code, const std::string& in, std::string& out);
 
 //分隔字符串
-void SplitStr(const std::string& source, const char delimiter, std::vector<std::string>& result);
+void SplitStr(const std::string& source, const std::string& delimiter, std::vector<std::string>& result);
 
 //计算语句调用花费的时间宏
 #define CalcTimeFuncInvoke(invoke, desc) {\
