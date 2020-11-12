@@ -16,42 +16,32 @@
 #include <functional>
 #include <type_traits>
 
-struct TTaskData;
-struct TSocketFD;
-struct TEventResult;
-template<typename T> class CTaskQueue;
-template<typename T> class CEventNotice;
-
-typedef CTaskQueue<TSocketFD> 					SOCKETFD_QUE;
-typedef CTaskQueue<std::shared_ptr<TTaskData>> 	TASK_QUE;
-typedef CEventNotice<std::string>				EVENT_NOTICE;
-
 enum MsgType
 {
-	REGIST,
-	REGIST_RSP,
-	LOGIN,
-	LOGIN_RSP,
-	LOGOUT,
-	LOGOUT_RSP,
-	HEARTBEAT,
-	CHAT,
-	QUERY_ROOM,
-	QUERY_ROOM_RSP,
-	QUERY_ROOM_PLAYERS,
-	QUERY_ROOM_PLAYERS_RSP,
-	CREATE_ROOM,
-	CREATE_ROOM_RSP,
-	JOIN_ROOM,
-	JOIN_ROOM_RSP,
-	QUIT_ROOM,
-	QUIT_ROOM_RSP,
-	GAME_READY,
-	GAME_READY_RSP,
-	QUIT_GAME_READY,
-	QUIT_GAME_READY_RSP,
-	REQ_GAME_START,
-	GAME_START
+       REGIST,
+       REGIST_RSP,
+       LOGIN,
+       LOGIN_RSP,
+       LOGOUT,
+       LOGOUT_RSP,
+       HEARTBEAT,
+       CHAT,
+       QUERY_ROOM,
+       QUERY_ROOM_RSP,
+       QUERY_ROOM_PLAYERS,
+       QUERY_ROOM_PLAYERS_RSP,
+       CREATE_ROOM,
+       CREATE_ROOM_RSP,
+       JOIN_ROOM,
+       JOIN_ROOM_RSP,
+       QUIT_ROOM,
+       QUIT_ROOM_RSP,
+       GAME_READY,
+       GAME_READY_RSP,
+       QUIT_GAME_READY,
+       QUIT_GAME_READY_RSP,
+       REQ_GAME_START,
+       GAME_START
 };
 
 #define IF_EXIT(predict, err) if(predict){ perror(err); exit(1); }
@@ -134,65 +124,6 @@ void CEventNotice<T>::Notice(uint64_t taskid, T& result)
 		std::promise<T>& ref_p = m_mapEventResult[taskid];
 		ref_p.set_value(result);
 	}
-}
-
-template<typename T>
-class CTaskQueue
-{
-public:
-	CTaskQueue(){}
-	~CTaskQueue(){}
-
-	void AddTask(T pNewTask);
-
-	T Wait_GetTask();
-
-	bool Try_GetTask(T& pTask);
-
-	bool Empty();
-
-private:
-	std::queue<T> m_qTask;
-	std::mutex m_mtx;
-	std::condition_variable m_cv;
-};
-
-template<typename T>
-void CTaskQueue<T>::AddTask(T pNewTask)
-{
-	std::lock_guard<std::mutex> lck(m_mtx);
-	m_qTask.push(pNewTask);
-	m_cv.notify_one();
-}
-
-template<typename T>
-T CTaskQueue<T>::Wait_GetTask()
-{
-	std::unique_lock<std::mutex> lck(m_mtx);
-	m_cv.wait(lck, [this](){ return !m_qTask.empty(); });
-	T res = m_qTask.front();
-	m_qTask.pop();
-	return res;
-}
-
-template<typename T>
-bool CTaskQueue<T>::Try_GetTask(T& pTask)
-{
-	std::lock_guard<std::mutex> lck(m_mtx);
-	if(m_qTask.empty())
-	{
-		return false;
-	}
-	pTask = m_qTask.front();
-	m_qTask.pop();
-	return true;
-}
-
-template<typename T>
-bool CTaskQueue<T>::Empty()
-{
-	std::lock_guard<std::mutex> lck(m_mtx);
-	return m_qTask.empty();
 }
 
 struct TTaskData

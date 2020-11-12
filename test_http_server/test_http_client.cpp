@@ -1,12 +1,14 @@
+#include "test_http_client.h"
+
 #include <event2/dns.h>
 #include <event2/event.h>
 #include <event2/http.h>
 #include <event2/keyvalq_struct.h>
 #include <event2/bufferevent.h>
 #include <event2/buffer.h>
+
 #include <iostream>
 #include <string.h>
-#include "test_http_client.h"
 #ifndef _WIN32
 #include <signal.h>
 #endif
@@ -15,12 +17,15 @@ using namespace std;
 static void http_client_cb(struct evhttp_request* req, void* ctx)
 {
     cout << "http_client_cb" << endl;
-    event_base* base = (event_base*)ctx;
+    RequestContext* req_ctx = (RequestContext*)ctx;
+    event_base* base = req_ctx->base;
     //服务端响应错误
     if(req == NULL)
     {
         int errcode = EVUTIL_SOCKET_ERROR();
-        cout << "请求出错: " << evutil_socket_error_to_string(errcode) << std::endl;
+        std::string str_err = evutil_socket_error_to_string(errcode);
+        cout << "请求出错: " <<  str_err << std::endl;
+        req_ctx->prom_rsp.set_value(str_err);
         return;
     }
 
@@ -48,26 +53,28 @@ static void http_client_cb(struct evhttp_request* req, void* ctx)
 
     //返回body
     cout << "=====response body======" << endl;
+    std::string str_rsp;
     evbuffer* input = evhttp_request_get_input_buffer(req);
     for(;;)
     {
         int len = evbuffer_remove(input, buf, sizeof(buf) -1);
         if(len <= 0) break;
         buf[len] = 0;
+        str_rsp += buf;
         cout << buf << std::endl;
     }
-    
+    req_ctx->prom_rsp.set_value(str_rsp);
     event_base_loopbreak(base);
 }
 
-int TestGetHttp()
+int TestGetHttp(const std::string& http_url, RequestContext& req_ctx)
 {
     event_base* base = event_base_new();
     evdns_base* dnsbase = evdns_base_new(base, 1);
 
     //生成请求信息 GET
-    string http_url = "http://ffmpeg.club/index.html";
-    http_url = "http://ffmpeg.club/101.jpg";
+    //string http_url = "http://ffmpeg.club/index.html";
+    //http_url = "http://ffmpeg.club/101.jpg";
 
     //分析url地址
     //uri
@@ -118,11 +125,15 @@ int TestGetHttp()
     evhttp_connection* evcon = evhttp_connection_base_new(base, dnsbase, host, port);
 
     //http client 请求
-    evhttp_request* req = evhttp_request_new(http_client_cb, base);
+    req_ctx.base = base;
+    evhttp_request* req = evhttp_request_new(http_client_cb, &req_ctx);
 
     // 设置请求的header信息
     evkeyvalq* output_headers = evhttp_request_get_output_headers(req);
     evhttp_add_header(output_headers, "Host", host);
+
+    //设置超时时间
+    //evhttp_connection_set_timeout(evcon, 60);
 
     //发起请求
     std::string uri_path = path;
@@ -140,10 +151,13 @@ int TestGetHttp()
     if (dnsbase) {
         evdns_base_free(dnsbase, 0);
     }
+    if (evcon) {
+        evhttp_connection_free(evcon);
+    }
     return 0;
 }
 
-int TestPostHttp(std::string http_url, std::string& data)
+int TestPostHttp(const std::string& http_url, std::string& data, RequestContext& req_ctx)
 {
     event_base* base = event_base_new();
     evdns_base* dnsbase = evdns_base_new(base, 1);
@@ -197,7 +211,8 @@ int TestPostHttp(std::string http_url, std::string& data)
     evhttp_connection* evcon = evhttp_connection_base_new(base, dnsbase, host, port);
 
     //http client 请求
-    evhttp_request* req = evhttp_request_new(http_client_cb, base);
+    req_ctx.base = base;
+    evhttp_request* req = evhttp_request_new(http_client_cb, &req_ctx);
 
     // 设置请求的header信息
     evkeyvalq* output_headers = evhttp_request_get_output_headers(req);
@@ -211,6 +226,9 @@ int TestPostHttp(std::string http_url, std::string& data)
     if (res != 0) {
         std::cout << "evbuffer_add error" << std::endl;
     }
+
+    //设置超时时间
+    //evhttp_connection_set_timeout(evcon, 60);
 
     //发起请求
     std::string uri_path = path;
@@ -227,6 +245,9 @@ int TestPostHttp(std::string http_url, std::string& data)
     }
     if (dnsbase) {
         evdns_base_free(dnsbase, 0);
+    }
+    if (evcon) {
+        evhttp_connection_free(evcon);
     }
     return 0;
 }

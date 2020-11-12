@@ -6,6 +6,7 @@
 #include <iostream>
 #include <sstream>
 #include <memory>
+#include <chrono>
 #include <string.h>
 #include <jsoncpp/json/json.h>
 #include "test_http_client.h"
@@ -79,14 +80,66 @@ static void send_infoflow(struct evhttp_request* request, std::string& input_dat
     if (root.isMember("alerts")) {
         if (root["alerts"].isArray()) {
             for (auto& one_alert : root["alerts"]) {
+                RequestContext req_ctx;
                 std::string send_msg = get_send_msg(one_alert);
-                TestPostHttp("http://apiin.im.baidu.com/api/msg/groupmsgsend?access_token=d55f306154a9c4425cf35161e220384b1", send_msg);
+                TestPostHttp("http://apiin.im.baidu.com/api/msg/groupmsgsend?access_token=d55f306154a9c4425cf35161e220384b1",
+                             send_msg,
+                             req_ctx);
             }
         }
     }
 
     evbuffer* outbuf = evhttp_request_get_output_buffer(request);
     evbuffer_add(outbuf, "ok", 2);
+    evhttp_send_reply(request, HTTP_OK, "", outbuf);
+}
+
+static std::string json_to_str(Json::Value& root) {
+	std::ostringstream ostr;
+    Json::StreamWriterBuilder builder;
+    builder["emitUTF8"] = true;//output utf-8
+    builder["indentation"] = "";//no indent
+    std::unique_ptr<Json::StreamWriter> s_writer(builder.newStreamWriter());
+    s_writer->write(root, &ostr);
+    return ostr.str();
+}
+static void download_topview(struct evhttp_request* request, const char* query, std::string& input_data) {
+    /*
+    Json::Value root;
+    Json::Reader reader;
+    if (!reader.parse(input_data, root)) {
+        std::cout << "json解析输入数据失败" << std::endl;
+        evhttp_send_reply(request, HTTP_BADREQUEST, "", 0);
+        return;
+    }
+    */
+
+    struct evkeyvalq kv;
+    int ret = evhttp_parse_query_str(query, &kv);
+    if (ret < 0) {
+        evhttp_send_reply(request, HTTP_INTERNAL, "", 0);
+    }
+    const char * type = evhttp_find_header(&kv, "type");
+    //TestGetHttp("http://gzhxy-ns-map-pre-chenxi101.gzhxy.baidu.com:8001");
+    std::string url = "http://10.123.16.12:8001/download_topview?type=";
+    url += type;
+    RequestContext req_ctx;
+    std::string str_rsp;
+    auto ft_rsp = req_ctx.prom_rsp.get_future();
+    TestGetHttp(url, req_ctx);
+    auto status = ft_rsp.wait_for(std::chrono::seconds(60));
+    if (status == std::future_status::timeout) {
+        str_rsp = "timeout";
+    } else {
+        str_rsp = ft_rsp.get();
+    }
+
+    //返回头部
+    evkeyvalq* outhead = evhttp_request_get_output_headers(request);
+    evhttp_add_header(outhead, "Access-Control-Allow-Origin", "*");
+    //返回体
+    evbuffer* outbuf = evhttp_request_get_output_buffer(request);
+    evbuffer_add(outbuf, str_rsp.c_str(), str_rsp.length());
     evhttp_send_reply(request, HTTP_OK, "", outbuf);
 }
 
@@ -101,18 +154,17 @@ static void do_uri(struct evhttp_request* request, const char* uri, std::string&
     if(strcmp(uri, "/") == 0) {
         filepath += DEFAULTINDEX;
     }
-    int pos = filepath.find_last_of("/\\");
-    string filename = filepath.substr(pos + 1);
-    std::cout << "filename = " << filename << std::endl;
-    pos = filename.rfind(".");
-    if (pos != std::string::npos) {
-        string file_postfix = filename.substr(pos + 1);
-        evhttp_send_reply(request, HTTP_NOTFOUND, "", 0);
-    }
 
-    if (strcmp(uri, "/send_infoflow") == 0) {
+    const struct evhttp_uri* evhttp_uri = evhttp_request_get_evhttp_uri(request);
+    const char* path = evhttp_uri_get_path(evhttp_uri);
+    const char* query =  evhttp_uri_get_query(evhttp_uri);
+
+    if (strcmp(path, "/send_infoflow") == 0) {
         std::cout << "do send_infoflow" << std::endl;
         send_infoflow(request, input_data);
+    } else if (strcmp(path, "/download_topview") == 0){
+        std::cout << "do download_topview" << std::endl;
+        download_topview(request, query, input_data);
     } else {
         evhttp_send_reply(request, HTTP_NOTFOUND, "", 0);
     }
@@ -120,12 +172,18 @@ static void do_uri(struct evhttp_request* request, const char* uri, std::string&
 
 static void http_cb(struct evhttp_request* request, void* arg)
 {
-    cout << "\nhttp_server_cb" <<endl;
+    //cout << "\nhttp_server_cb" <<endl;
     //1 获取游览器的请求信息
     //uri
     const char* uri = evhttp_request_get_uri(request);
+    const struct evhttp_uri* evhttp_uri = evhttp_request_get_evhttp_uri(request);
+    const char* path = evhttp_uri_get_path(evhttp_uri);
+    const char* query =  evhttp_uri_get_query(evhttp_uri);
     cout << "\n=====request======" << endl;
     cout << "uri: " << uri << endl;
+    cout << "path: " << path << endl;
+    cout << "query: " << query << endl;
+
 
     // 请求类型 GET POST
     string cmdtype;
