@@ -309,6 +309,18 @@ void SplitStr(const std::string& source, const std::string& delimiter, std::vect
     delete[] strc;
 }
 
+std::string joinstr(std::vector<std::string>& src, const std::string& conn_str)
+{
+    std::string ret;
+    std::vector<std::string>::iterator iter = src.begin();
+    for (; iter != src.end(); ++iter) {
+        ret += *iter + conn_str;
+    }
+    //移除最后的连接字符 conn_str
+    ret.erase(ret.end() - conn_str.size());
+    return ret;
+}
+
 static bool is_dir(const std::string& str_path) {                                                          
     struct stat st;                                                                                 
     if(stat(str_path.c_str(), &st) < 0) {                                                           

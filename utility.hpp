@@ -757,6 +757,9 @@ void TransCoding(const char* from_code, const char* to_code, const std::string& 
 //分隔字符串
 void SplitStr(const std::string& source, const std::string& delimiter, std::vector<std::string>& result);
 
+//连接字符串
+std::string joinstr(std::vector<std::string>& src, const std::string& conn_str);
+
 //目录遍历
 void traverse_dir(const std::string& str_dir, std::vector<std::string>* vec_files, std::vector<std::string>* vec_dirs);
 
