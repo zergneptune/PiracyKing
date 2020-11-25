@@ -950,3 +950,74 @@ void test_curses()
     delwin(messagebar);
 	endwin(); /*关闭curses状态*/
 }
+
+void cross_print() {
+	bool b_odd = false;
+    std::mutex mtx_odd;
+    std::condition_variable cv_odd;
+
+    bool b_even = false;
+    std::mutex mtx_even;
+    std::condition_variable cv_even;
+
+    std::thread print_odd([&](){
+            for (int i = 1; i <= 10; i+=2) {
+                std::unique_lock<std::mutex> lock(mtx_odd);
+                printf("wait to print odd\n");
+                cv_odd.wait(lock, [&b_odd](){
+                        return b_odd;
+                    });
+                printf("odd thread : %d\n", i);
+                b_odd = false;
+
+                //通知even线程输出
+                {
+                    std::lock_guard<std::mutex> lck(mtx_even);
+                    b_even = true;
+                }
+                cv_even.notify_one();
+            }
+        });
+
+	    std::thread print_even([&](){
+            for (int i = 2; i <= 10; i+=2) {
+                std::unique_lock<std::mutex> lock(mtx_even);
+                printf("wait to print even\n");
+                cv_even.wait(lock, [&b_even](){
+                        return b_even;
+                    });
+                printf("even thread : %d\n", i);
+                b_even = false;
+
+                //通知odd线程输出
+                {
+                    std::lock_guard<std::mutex> lck(mtx_odd);
+                    b_odd = true;
+                }
+                cv_odd.notify_one();
+            }
+        });
+
+    printf("first nodity odd thread \n");
+    {
+        std::lock_guard<std::mutex> lck(mtx_odd);
+        b_odd = true;
+    }
+    cv_odd.notify_one();
+    /*
+    auto ft = std::async(std::launch::deferred, [&](){
+            printf("first nodity odd thread \n");
+            {
+                std::lock_guard<std::mutex> lck(mtx_odd);
+                b_odd = true;
+            }
+            cv_odd.notify_one();
+        });
+    if (ft.valid()) {
+        ft.get();
+    }
+    */
+
+    print_odd.join();
+    print_even.join();
+}
