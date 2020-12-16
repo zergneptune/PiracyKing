@@ -526,9 +526,15 @@ int main(int argc, char const *argv[])
             int_rbt.in_order();
         }
     }
+    std::cout << std::endl;
 
-    std::vector<std::string> vec_test = {"a", "b", "c"};
-    std::cout << joinstr(vec_test, ",") << std::endl;
-        
+    std::vector<std::string> vec_test;
+    joinstr(vec_test, ",");
+    std::string src("hello");
+    std::cout << to_upper(src) << std::endl;
+    std::cout << start_with(src, "hello world!") << std::endl;
+    std::cout << end_with(src, "hello") << std::endl;
+    std::cout << end_with(src, "") << std::endl;
+
     return 0;
 }

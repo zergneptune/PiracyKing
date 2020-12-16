@@ -758,7 +758,17 @@ void TransCoding(const char* from_code, const char* to_code, const std::string& 
 void SplitStr(const std::string& source, const std::string& delimiter, std::vector<std::string>& result);
 
 //连接字符串
-std::string joinstr(std::vector<std::string>& src, const std::string& conn_str);
+std::string joinstr(const std::vector<std::string>& src, const std::string& conn_str);
+
+//字符串转大写
+std::string to_upper(const std::string& src);
+//字符串转小写
+std::string to_lower(const std::string& src);
+
+//检测以指定字符开头的字符串
+bool start_with(const std::string& src, const std::string& start);
+//检测以指定字符结尾的字符串
+bool end_with(const std::string& src, const std::string& end);
 
 //目录遍历
 void traverse_dir(const std::string& str_dir, std::vector<std::string>* vec_files, std::vector<std::string>* vec_dirs);

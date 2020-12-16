@@ -286,7 +286,7 @@ shutdown:
     return 0;
 }
 
-int ssh_scp(int argc, char *argv[]) {
+int ssh_scp_recv(int argc, char *argv[]) {
     unsigned long hostaddr;
     int sock, i, auth_pw = 1;
     struct sockaddr_in sin;
@@ -645,7 +645,7 @@ int ssh_scp_send(int argc, char* argv[]) {
 
 int main(int argc, char* argv[]) {
     //ssh_exec(argc, argv);
-	//ssh_scp(argc, argv);
-	ssh_scp_send(argc, argv);
+	ssh_scp_recv(argc, argv);
+	//ssh_scp_send(argc, argv);
     return 0;
 }

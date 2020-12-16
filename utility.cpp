@@ -309,16 +309,54 @@ void SplitStr(const std::string& source, const std::string& delimiter, std::vect
     delete[] strc;
 }
 
-std::string joinstr(std::vector<std::string>& src, const std::string& conn_str)
+std::string joinstr(const std::vector<std::string>& src, const std::string& conn_str)
 {
     std::string ret;
-    std::vector<std::string>::iterator iter = src.begin();
-    for (; iter != src.end(); ++iter) {
-        ret += *iter + conn_str;
+    std::vector<std::string>::const_iterator citer = src.begin();
+    for (; citer != src.end(); ++citer) {
+        ret += *citer + conn_str;
     }
     //移除最后的连接字符 conn_str
-    ret.erase(ret.end() - conn_str.size());
+    if (!src.empty()) {
+        ret.erase(ret.end() - conn_str.size());
+    }
     return ret;
+}
+
+std::string to_upper(const std::string& src)
+{
+    std::string str_ret(src);
+    std::transform(src.begin(), src.end(), str_ret.begin(), [](const std::string::value_type& ch) {
+                   return std::toupper(ch);
+                   });
+    return str_ret;
+}
+
+std::string to_lower(const std::string& src)
+{
+    std::string str_ret(src);
+    std::transform(src.begin(), src.end(), str_ret.begin(), [](const std::string::value_type& ch) {
+                   return std::tolower(ch);
+                   });
+    return str_ret;
+}
+
+bool start_with(const std::string& src, const std::string& start)
+{
+    std::string::size_type pos = src.find(start);
+    if (pos == 0) {
+        return true;
+    }
+    return false;
+}
+
+bool end_with(const std::string& src, const std::string& end)
+{
+    std::string::size_type pos = src.rfind(end);
+    if (pos == (src.size() - end.size())) {
+        return true;
+    }
+    return false;
 }
 
 static bool is_dir(const std::string& str_path) {                                                          
