@@ -470,6 +470,14 @@ void thread_func(CSnowFlake* p)
     }
 }
 
+class TA
+{
+public:
+    void operator()() {
+        printf("hello world!\n");
+    }
+};
+
 int main(int argc, char const *argv[])
 {
     (void)argc;
@@ -528,13 +536,12 @@ int main(int argc, char const *argv[])
     }
     std::cout << std::endl;
 
-    std::vector<std::string> vec_test;
-    joinstr(vec_test, ",");
-    std::string src("hello");
-    std::cout << to_upper(src) << std::endl;
-    std::cout << start_with(src, "hello world!") << std::endl;
-    std::cout << end_with(src, "hello") << std::endl;
-    std::cout << end_with(src, "") << std::endl;
+    thread_pool tp;
+    printf("debug\n");
+    tp.submit(TA());
+    //tp.run_pending_task();
+    sleep(5);
+
 
     return 0;
 }

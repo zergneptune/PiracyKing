@@ -569,6 +569,7 @@ private:
 			function_wrapper task;
 			if (work_queue.try_pop(task))
 			{
+                printf("dowork\n");
 				task();
 			}
 			else
@@ -588,6 +589,7 @@ public:
 		{
 			for (unsigned i = 0; i < thread_count; ++i)
 			{
+                printf("add threadpool\n");
 				//加入线程池
 				threads.push_back(
 						std::thread(&thread_pool::worker_thread, this));
@@ -609,6 +611,7 @@ public:
 	template<typename FunctionType>
 	void submit(FunctionType f)
 	{
+        printf("do submit\n");
 		work_queue.push(std::move(f));
 	}
 	
